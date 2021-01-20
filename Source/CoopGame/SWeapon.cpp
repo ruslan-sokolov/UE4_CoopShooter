@@ -180,6 +180,8 @@ void ASWeapon::Tick(float DeltaTime)
 // RECOIL BLOCK
 void ASWeapon::AddRecoil()
 {
+	if (!OwnerPlayerController) // if character is not player return
+		return;
 
 	float TotalModifier = RecoilModifiers.GetTotalModifier();
 
@@ -198,6 +200,10 @@ void ASWeapon::AddRecoil()
 
 void ASWeapon::CompensateRecoil(float DeltaSec)
 {
+
+	if (!OwnerPlayerController)  // if character is not player return
+		return;
+
 	if (TimeSinceLastShot >= RecoilParams.RecoilFadeTime && RecoilParams.RecoilFadeProgress != 0.0f) {
 
 		RecoilParams.ClearRecoilAcommulation();
@@ -209,7 +215,7 @@ void ASWeapon::CompensateRecoil(float DeltaSec)
 
 		float YawCompensation = -RecoilParams.RecoilAccumulationYaw * DeltaSec * RecoilParams.RecoilFadeTime;
 		RecoilParams.RecoilAccumulationYaw += YawCompensation;
-
+		
 		OwnerPlayerController->AddPitchInput(PitchCompensation);
 		OwnerPlayerController->AddYawInput(YawCompensation);
 
