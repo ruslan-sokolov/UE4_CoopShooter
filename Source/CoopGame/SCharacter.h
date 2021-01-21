@@ -15,6 +15,8 @@ class USpringArmComponent;
 class ASWeapon;
 class FString;
 
+class USHealthComponent;
+
 UENUM(BlueprintType)
 enum class ECharacterState : uint8
 {
@@ -34,7 +36,7 @@ enum class ECharacterState : uint8
 	VehiclePilot UMETA(DisplayName = "VehiclePilot"), // not used yet
 	VehiclePassenger UMETA(DisplayName = "VehiclePassenger"), // not used yet
 
-	Dead // not used yet
+	Dead UMETA(DisplayName = "Dead"), // not used yet
 
 };
 
@@ -96,22 +98,25 @@ protected:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Components")
 		USpringArmComponent* SpringArmComp;
 
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Components")
+		USHealthComponent* HealthComp;
+
 	/** Character Speed while sprinting **/
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Character Movement: Sprint")
 		float SprintSpeed = 720.0f;
 
 	/** Default weapon class to spawn with player  **/
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Character: Combat")
 		TSubclassOf<ASWeapon> WeaponClassToSpawnWith;
 
 	bool bWantsToZoom;
 
 	/** Change FOV when aiming can be overriden by weapon settings **/
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Player")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Character: Player")
 	float ZoomedFOV;
 
 	/** Change FOV speed. Bigger value - smoother can be overriden by weapon settings**/
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Player", meta = (ClampMin = 0.1f, ClampMax = 100.0f))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Character: Player", meta = (ClampMin = 0.1f, ClampMax = 100.0f))
 		float ZoomInterpSpeed = 20.0f;
 
 	/* Default FOV Set During Begin Play */
@@ -144,29 +149,27 @@ public:
 
 	virtual FVector GetPawnViewLocation() const override;
 
-	UFUNCTION(BlueprintCallable, Category = "Combat")
+	UFUNCTION(BlueprintCallable, Category = "Chracter: Combat")
 		void SpawnWeapon(TSubclassOf<ASWeapon> WeaponClass);
 
+	UFUNCTION()
+		void OnHealthChanged(USHealthComponent* OwningHealthComp, float Health, float HealthDelta,
+			const class UDamageType* DamageType, class AController* InstigatedBy, AActor* DamageCauser);
 
-	///** Default character crosshair **/
-	//UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UMG")
-	//	TSubclassOf<UUserWidget> DefaultCrosshairClass;
-	//
-	//UUserWidget* CurrentCrosshair;
+	UPROPERTY(BlueprintReadOnly, Category = "Chracter: State")
+		ECharacterState CharacterState;
 
-	ECharacterState State;
-
-	UFUNCTION(BlueprintCallable, Category = "Movement States")
+	UFUNCTION(BlueprintCallable, Category = "Chracter: State")
 		void SetState(ECharacterState NewState);
 
 	void BeginJump();
 
 	/** Current State Active Time* */
-	UPROPERTY(BlueprintReadOnly, Category = "Movement States")
+	UPROPERTY(BlueprintReadOnly, Category = "Chracter: State")
 		float StateTime;
 
 	/** Carried Weapon Speed modifier **/
-	UPROPERTY(BlueprintReadOnly, Category = "Combat")
+	UPROPERTY(BlueprintReadOnly, Category = "Chracter: Combat")
 		float CarriedWeaponSpeedModifier = 1.0f;
 
 	bool bShouldSprinting;
@@ -174,11 +177,11 @@ public:
 	float BaseSpeed;
 
 	/** Weapon Attachment SocketName **/
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Combat")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Chracter: Combat")
 		FName WeaponSocketName = "WeaponSocket";
 
 	/** Current Character Weapon  **/
-	UPROPERTY(BlueprintReadOnly, Category = "Combat")
+	UPROPERTY(BlueprintReadOnly, Category = "Chracter: Combat")
 		ASWeapon* Weapon;
 
 };

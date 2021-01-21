@@ -34,7 +34,7 @@ FAutoConsoleVariableRef CVARDebugWeaponDrawing_Recoil(
 	TEXT("Draw Debug Text For Weapon Recoil"),
 	ECVF_Cheat);
 
-FAutoConsoleVariableRef CVARDebugWeaponDrawing_RecoilCompenstate(
+FAutoConsoleVariableRef CVARDebugWeaponDrawing_RecoilCompensate(
 	TEXT("COOP.DebugWeapons.RecoilCompensate"),
 	DebugWeaponDrawing_RecoilCompensate,
 	TEXT("Draw Debug Text For Weapon Recoil Compenstation"),
@@ -77,7 +77,7 @@ void ASWeapon::BeginPlay()
 void ASWeapon::AttachToASCharacter(ASCharacter* Character)
 {
 
-	if (!Character || Character->State == ECharacterState::Dead) {
+	if (!Character || Character->CharacterState == ECharacterState::Dead) {
 		UE_LOG(LogTemp, Warning, TEXT("Attempt to attach weapon to invalid character"))
 		return;
 	}
@@ -148,7 +148,7 @@ void ASWeapon::Tick(float DeltaTime)
 	if (CharOwner)
 	{
 		float VelocityModifierNormalized = CharOwner->GetVelocity().Size() / CharOwner->BaseSpeed;
-		CharacterAimPose Pos = CharStateToAimPose(CharOwner->State);
+		CharacterAimPose Pos = CharStateToAimPose(CharOwner->CharacterState);
 
 		SpreadModifiers.SetPosModifier(Pos);
 		RecoilModifiers.SetPosModifier(Pos);

@@ -13,6 +13,7 @@
 
 #include "SWeapon.h"
 #include "CoopGame.h"
+#include "Components/SHealthComponent.h"
 
 // Sets default values
 ASCharacter::ASCharacter()
@@ -30,6 +31,11 @@ ASCharacter::ASCharacter()
 	GetMovementComponent()->GetNavAgentPropertiesRef().bCanCrouch = true;
 
 	GetCapsuleComponent()->SetCollisionResponseToChannel(COLLISION_WEAPON, ECR_Ignore);
+
+	HealthComp = CreateDefaultSubobject<USHealthComponent>(TEXT("HealthComp"));
+
+	HealthComp->OnHealthChanged.AddDynamic(this, &ASCharacter::OnHealthChanged);
+
 }
 
 // Called when the game starts or when spawned
@@ -87,18 +93,18 @@ void ASCharacter::Tick(float DeltaTime)
 	}
 	else if (GetVelocity().Size() < 0.01f) /* Zero Velocity Magnitude */
 	{
-		if (State != ECharacterState::Crouch)
+		if (CharacterState != ECharacterState::Crouch)
 			SetState(ECharacterState::Idle);
 	}
 	else /* Positive Velocity Magnitude */
 	{
-		if (State == ECharacterState::Idle || State == ECharacterState::Falling)
+		if (CharacterState == ECharacterState::Idle || CharacterState == ECharacterState::Falling)
 			SetState(ECharacterState::Run);
 	}
 	//
 
 	// DEBUG STATE
-	DrawDebugString(GetWorld(), GetMesh()->GetBoneLocation(FName(TEXT("head"))) + FVector(0.0f, 30.0f, 30.0f), *FString::Printf(TEXT("%s"), *DebugCharState(State)), (AActor*)0, FColor::White, DeltaTime);
+	DrawDebugString(GetWorld(), GetMesh()->GetBoneLocation(FName(TEXT("head"))) + FVector(0.0f, 30.0f, 30.0f), *FString::Printf(TEXT("%s"), *DebugCharState(CharacterState)), (AActor*)0, FColor::White, DeltaTime);
 	DrawDebugString(GetWorld(), GetMesh()->GetBoneLocation(FName(TEXT("head"))) + FVector(0.0f, -30.0f, 30.0f), *FString::Printf(TEXT("%d"), (int32)GetVelocity().Size()), (AActor*)0, FColor::White, DeltaTime);
 	//
 }
@@ -290,26 +296,27 @@ void ASCharacter::SpawnWeapon(TSubclassOf<ASWeapon> WeaponClass)
 	SpawnedWeapon->AttachToASCharacter(this);
 }
 
-void ASCharacter::SetState(ECharacterState NewState)
+
+void ASCharacter::SetState(ECharacterState NewCharacterState)
 {
 
-	if (State == NewState)
+	if (CharacterState == NewCharacterState)
 		return;
 
-	ECharacterState NewStateFiltered;
+	ECharacterState NewCharacterStateFiltered;
 
 	// sprint resolve
-	if (NewState == ECharacterState::Run && bShouldSprinting && GetVelocity().Size() > BaseSpeed)
-		NewStateFiltered = ECharacterState::Sprint;
+	if (NewCharacterState == ECharacterState::Run && bShouldSprinting && GetVelocity().Size() > BaseSpeed)
+		NewCharacterStateFiltered = ECharacterState::Sprint;
 	else
-		NewStateFiltered = NewState;
+		NewCharacterStateFiltered = NewCharacterState;
 
-	// next state after jumping can only falling
-	if (State == ECharacterState::Jumping && (NewState != ECharacterState::Falling || NewState != ECharacterState::Dead))
+	// next CharacterState after jumping can only falling
+	if (CharacterState == ECharacterState::Jumping && (NewCharacterState != ECharacterState::Falling || NewCharacterState != ECharacterState::Dead))
 	{
 		//return;
 	}
-	else if (State == ECharacterState::Dead)
+	else if (CharacterState == ECharacterState::Dead)
 	{
 		return;
 	}
@@ -318,12 +325,7 @@ void ASCharacter::SetState(ECharacterState NewState)
 
 	}
 
-	// print
-	//if (GEngine)
-	//	GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, *FString::Printf(TEXT("[Char State] Old: %s New: %s"), *DebugCharState(State), *DebugCharState(NewStateFiltered)));
-	//
-
-	State = NewStateFiltered;
+	CharacterState = NewCharacterStateFiltered;
 
 	StateTime = 0.0f;
 	
@@ -341,5 +343,26 @@ void ASCharacter::BeginJump()
 	ACharacter::Jump();
 
 	SetState(ECharacterState::Jumping);
+
+}
+
+
+
+void ASCharacter::OnHealthChanged(USHealthComponent* OwningHealthComp, float Health, float HealthDelta,
+	const UDamageType* DamageType, AController* InstigatedBy, AActor* DamageCauser)
+{
+	if (Health <= 0.0f && CharacterState != ECharacterState::Dead)
+	{
+		// DIE!
+		GetMovementComponent()->StopMovementImmediately();
+		GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+		CharacterState = ECharacterState::Dead;
+
+		DetachFromControllerPendingDestroy();
+
+		SetLifeSpan(10.0f);
+
+	}
 
 }
