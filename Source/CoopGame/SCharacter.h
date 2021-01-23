@@ -152,6 +152,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Chracter: Combat")
 		void SpawnWeapon(TSubclassOf<ASWeapon> WeaponClass);
 
+	UFUNCTION(Server, Reliable)
+		void ServerSpawnWeapon(TSubclassOf<ASWeapon> WeaponClass);
+
 	UFUNCTION()
 		void OnHealthChanged(USHealthComponent* OwningHealthComp, float Health, float HealthDelta,
 			const class UDamageType* DamageType, class AController* InstigatedBy, AActor* DamageCauser);
@@ -181,7 +184,7 @@ public:
 		FName WeaponSocketName = "WeaponSocket";
 
 	/** Current Character Weapon  **/
-	UPROPERTY(BlueprintReadOnly, Category = "Chracter: Combat")
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Chracter: Combat")
 		ASWeapon* Weapon;
 
 };

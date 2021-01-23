@@ -21,6 +21,8 @@
 #include "SCrosshairWidget.h"
 #include "CoopHUD.h"
 
+#include "Net/UnrealNetwork.h"
+
 
 FAutoConsoleVariableRef CVARDebugWeaponDrawing_Shot(
 	TEXT("COOP.DebugWeapons.Shot"),
@@ -63,6 +65,8 @@ ASWeapon::ASWeapon()
 
 	DamageType = UDamageType::StaticClass();
 
+	SetReplicates(true);
+	SetReplicateMovement(true);
 
 }
 
@@ -79,10 +83,28 @@ void ASWeapon::BeginPlay()
 
 void ASWeapon::AttachToASCharacter(ASCharacter* Character)
 {
+	ServerAttachToASCharacter(Character);
+
+	// Weapon Crosshair Resolve
+	if (CrosshairOverride && OwnerPlayerController) {
+		ACoopHUD* HUD = Cast<ACoopHUD>(OwnerPlayerController->GetHUD());
+		
+		if (HUD)
+			HUD->SetCrosshair(CrosshairOverride);
+	}
+
+	Character->Weapon = this;
+	Character->CarriedWeaponSpeedModifier = CharacterSpeedModifier;
+
+}
+
+
+void ASWeapon::ServerAttachToASCharacter_Implementation(ASCharacter* Character)
+{
 
 	if (!Character || Character->CharacterState == ECharacterState::Dead) {
 		UE_LOG(LogTemp, Warning, TEXT("Attempt to attach weapon to invalid character"))
-		return;
+			return;
 	}
 
 	if (Character->Weapon) // remove prev weapon
@@ -100,17 +122,6 @@ void ASWeapon::AttachToASCharacter(ASCharacter* Character)
 	OwnerPlayerController = Cast<APlayerController>(CharOwner->GetController()); 	// CAMERA SHAKE INITIALZIE
 	SetInstigator(Character);
 	SetOwner(Character);
-
-	// Weapon Crosshair Resolve
-	if (CrosshairOverride && OwnerPlayerController) {
-		ACoopHUD* HUD = Cast<ACoopHUD>(OwnerPlayerController->GetHUD());
-		
-		if (HUD)
-			HUD->SetCrosshair(CrosshairOverride);
-	}
-
-	Character->Weapon = this;
-	Character->CarriedWeaponSpeedModifier = CharacterSpeedModifier;
 
 }
 
@@ -248,6 +259,7 @@ FRotator ASWeapon::CalcSpread()
 	return FRotator(RandPitch, RandYaw, 0.0f);
 
 }
+
 
 // FIRE BLOCK
 void ASWeapon::SemiAutoFireTimerBind(bool ShotDelayed)
@@ -412,6 +424,11 @@ void ASWeapon::PlayFireEffects()
 void ASWeapon::Fire()
 {
 
+	if (GetLocalRole() < ROLE_Authority)
+	{
+		ServerFire();
+	}
+
 	if (bShotIsDelayed || bIsReloading || AmmoCurrent == 0)
 	{
 		return;
@@ -463,6 +480,21 @@ void ASWeapon::Fire()
 }
 
 
+void ASWeapon::ServerFire_Implementation()
+{
+	//Fire();
+	FireLogic();
+	PlayFireEffects();
+
+}
+
+
+bool ASWeapon::ServerFire_Validate()
+{
+	return true;
+}
+
+
 // RELOADING BLOCK
 void ASWeapon::InterruptReload()
 {
@@ -506,4 +538,13 @@ void ASWeapon::StartReload()
 
 	}
 
+}
+
+
+// NETWORKING REPLICATION
+void ASWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(ASWeapon, CharOwner);
 }

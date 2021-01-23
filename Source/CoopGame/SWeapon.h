@@ -522,7 +522,8 @@ protected:
 	 APlayerController* OwnerPlayerController;
 
 	 /* SPREAD Character ref to get velocity for spread cal etc */
-	 ASCharacter* CharOwner;
+	 UPROPERTY(Replicated)
+		ASCharacter* CharOwner;
 
 public:
 	
@@ -540,6 +541,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Weapon: Fire")
 		virtual void Fire();
+
+	UFUNCTION(Server, Reliable, WithValidation)
+		void ServerFire();
 
 	UFUNCTION(BlueprintCallable, Category = "Weapon: Ammo")
 		virtual void StartReload();
@@ -565,6 +569,9 @@ public:
 	/** Attach Weapon To Character */
 	UFUNCTION(BlueprintCallable, Category = "Weapon: Use")
 		void AttachToASCharacter(ASCharacter* Character);
+
+	UFUNCTION(Server, Reliable)
+		void ServerAttachToASCharacter(ASCharacter* Character);
 
 	virtual void BeginDestroy() override;
 

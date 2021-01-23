@@ -15,6 +15,8 @@
 #include "CoopGame.h"
 #include "Components/SHealthComponent.h"
 
+#include "Net/UnrealNetwork.h"
+
 // Sets default values
 ASCharacter::ASCharacter()
 {
@@ -51,8 +53,12 @@ void ASCharacter::BeginPlay()
 
 	DefaultFOV = CameraComp->FieldOfView;
 
-	if (WeaponClassToSpawnWith)
-		SpawnWeapon(WeaponClassToSpawnWith);
+	if (GetLocalRole() == ROLE_Authority)
+	{
+		if (WeaponClassToSpawnWith)
+			SpawnWeapon(WeaponClassToSpawnWith);
+	}
+
 
 }
 
@@ -292,10 +298,27 @@ void ASCharacter::EndCrouch()
 
 void ASCharacter::SpawnWeapon(TSubclassOf<ASWeapon> WeaponClass)
 {
+	if (GEngine /*&& IsLocallyControlled()*/)
+		GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Cyan, *FString::Printf(
+			TEXT("SpawnWeapon")));
+	
+	//if (GetLocalRole() < ROLE_Authority)
+	//	return;
+
+	ServerSpawnWeapon(WeaponClass);
+
+}
+
+
+void ASCharacter::ServerSpawnWeapon_Implementation(TSubclassOf<ASWeapon> WeaponClass)
+{
+	if (GEngine)
+		GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Cyan, *FString::Printf(
+			TEXT("ServerSpawnWeapon_Implementation")));
+
 	ASWeapon* SpawnedWeapon = GetWorld()->SpawnActor<ASWeapon>(WeaponClass, GetActorLocation(), GetActorRotation());
 	SpawnedWeapon->AttachToASCharacter(this);
 }
-
 
 void ASCharacter::SetState(ECharacterState NewCharacterState)
 {
@@ -375,4 +398,12 @@ void ASCharacter::OnHealthChanged(USHealthComponent* OwningHealthComp, float Hea
 
 	}
 
+}
+
+
+void ASCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(ASCharacter, Weapon);
 }
