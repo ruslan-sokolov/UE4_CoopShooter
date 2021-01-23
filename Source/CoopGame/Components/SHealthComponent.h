@@ -26,15 +26,15 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category = "HealthComponent")
 		float Health;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "HealthComponent")
-		float DefaultHealth;
-
 	UFUNCTION()
 		void HandleTakeAnyDamage(AActor* DamagedActor, float Damage, const class UDamageType* DamageType, 
 			class AController* InstigatedBy, AActor* DamageCauser);
 
 public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "HealthComponent")
+		float DefaultHealth;
 
 	UPROPERTY(BlueprintAssignable, Category = "Events")
 		FOnHealthChangedSignature OnHealthChanged;
+
 };
