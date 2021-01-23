@@ -61,6 +61,9 @@ ASWeapon::ASWeapon()
 	// HUD SPREAD VAL INITIALIZE
 	CurrentSpreadAngle = SpreadBaseAngle;
 
+	DamageType = UDamageType::StaticClass();
+
+
 }
 
 

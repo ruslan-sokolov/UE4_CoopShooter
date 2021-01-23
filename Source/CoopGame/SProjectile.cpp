@@ -92,7 +92,7 @@ void ASProjectile::Detonate()
 
 	TArray<AActor*> IgnoredActors;
 
-	UGameplayStatics::ApplyRadialDamage(GetWorld(), Damage, GetActorLocation(), DamageRadius, DamageType, IgnoredActors, GetOwner(), GetInstigatorController(), true);
+	UGameplayStatics::ApplyRadialDamage(GetWorld(), Damage, GetActorLocation(), DamageRadius, DamageType, IgnoredActors, GetOwner(), GetInstigatorController(), bDoFullDamage);
 
 	//DrawDebugSphere(GetWorld(), GetActorLocation(), DamageRadius, 12, FColor::Red, false, 2.0f);
 

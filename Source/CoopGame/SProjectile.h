@@ -77,6 +77,9 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Damage")
 		float DamageRadius = 300.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Damage")
+		bool bDoFullDamage;
+
 	bool bDetonationTriggered;
 
 public:	

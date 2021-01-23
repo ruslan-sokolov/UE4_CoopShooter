@@ -94,6 +94,21 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Explode Launch Impulse")
 		FExplodableLaunchImpulse LaunchImpulseParams;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Radial Damage")
+		bool bEnableRadialDamage = true;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Radial Damage", meta = (EditCondition = "bEnableRadialDamage"))
+		TSubclassOf<UDamageType> DamageType;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Radial Damage", meta = (EditCondition = "bEnableRadialDamage"))
+		float Damage = 200.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Radial Damage", meta = (EditCondition = "bEnableRadialDamage"))
+		float DamageRadius = 300.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Radial Damage", meta = (EditCondition = "bEnableRadialDamage"))
+		bool bDoFullDamage;
+
 	void explode();
 
 	bool bExploded;
@@ -102,6 +117,6 @@ public:
 
 	UFUNCTION()
 		void OnHealthChanged(USHealthComponent* OwningHealthComp, float Health, float HealthDelta,
-			const class UDamageType* DamageType, class AController* InstigatedBy, AActor* DamageCauser);
+			const class UDamageType* InstigatedDamageType, class AController* InstigatedBy, AActor* DamageCauser);
 
 };

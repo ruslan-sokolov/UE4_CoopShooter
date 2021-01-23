@@ -157,7 +157,7 @@ void ASCharacter::Reload()
 
 void ASCharacter::BeginZoom()
 {
-
+	
 	bWantsToZoom = true;
 
 	if (Weapon)
@@ -300,7 +300,7 @@ void ASCharacter::SpawnWeapon(TSubclassOf<ASWeapon> WeaponClass)
 void ASCharacter::SetState(ECharacterState NewCharacterState)
 {
 
-	if (CharacterState == NewCharacterState)
+	if (CharacterState == NewCharacterState || CharacterState == ECharacterState::Dead)
 		return;
 
 	ECharacterState NewCharacterStateFiltered;
@@ -311,19 +311,19 @@ void ASCharacter::SetState(ECharacterState NewCharacterState)
 	else
 		NewCharacterStateFiltered = NewCharacterState;
 
-	// next CharacterState after jumping can only falling
+	/*// next CharacterState after jumping can only falling
 	if (CharacterState == ECharacterState::Jumping && (NewCharacterState != ECharacterState::Falling || NewCharacterState != ECharacterState::Dead))
 	{
-		//return;
+	
 	}
 	else if (CharacterState == ECharacterState::Dead)
 	{
-		return;
+		
 	}
 	else
 	{
 
-	}
+	}*/
 
 	CharacterState = NewCharacterStateFiltered;
 
@@ -357,11 +357,21 @@ void ASCharacter::OnHealthChanged(USHealthComponent* OwningHealthComp, float Hea
 		GetMovementComponent()->StopMovementImmediately();
 		GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-		CharacterState = ECharacterState::Dead;
+		StopFire();
+		EndZoom();
 
-		DetachFromControllerPendingDestroy();
+		SetState(ECharacterState::Dead);
+		//CharacterState = ECharacterState::Dead;
+
+		// DetachFromControllerPendingDestroy();
+		Controller->UnPossess();
+
+		GetCharacterMovement()->bOrientRotationToMovement = true;
+		bUseControllerRotationYaw = false;
 
 		SetLifeSpan(10.0f);
+
+		// GetMesh()->SetSimulatePhysics(true);
 
 	}
 
