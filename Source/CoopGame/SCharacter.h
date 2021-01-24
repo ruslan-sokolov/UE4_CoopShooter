@@ -136,7 +136,14 @@ public:
 	void EndCrouch();
 
 	void BeginSprint();
+
+	UFUNCTION(Server, Unreliable)
+		void ServerBeginSprint();
+	
 	void EndSprint();
+
+	UFUNCTION(Server, Unreliable)
+		void ServerEndSprint();
 
 	void BeginZoom();
 	void EndZoom();
@@ -159,11 +166,14 @@ public:
 		void OnHealthChanged(USHealthComponent* OwningHealthComp, float Health, float HealthDelta,
 			const class UDamageType* DamageType, class AController* InstigatedBy, AActor* DamageCauser);
 
-	UPROPERTY(BlueprintReadOnly, Category = "Chracter: State")
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Chracter: State")
 		ECharacterState CharacterState;
 
 	UFUNCTION(BlueprintCallable, Category = "Chracter: State")
 		void SetState(ECharacterState NewState);
+
+	UFUNCTION(Server, Unreliable)
+		void ServerSetState(ECharacterState NewState);
 
 	void BeginJump();
 

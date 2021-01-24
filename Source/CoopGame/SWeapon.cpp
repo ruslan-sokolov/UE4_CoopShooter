@@ -76,8 +76,9 @@ void ASWeapon::BeginPlay()
 	Super::BeginPlay();
 
 	// RELOAD ANIM SPEED MODIFIER INITIALIZE
-	if (ReloadSpeed > 0)
-		ReloadMontageSpeedMultiplier = ReloadAnimMontage->SequenceLength / ReloadSpeed;
+	if (ReloadSpeed < 0.0f)
+		// ReloadMontageSpeedMultiplier = ReloadAnimMontage->SequenceLength / ReloadSpeed;
+		ReloadSpeed = ReloadAnimMontage->SequenceLength;
 }
 
 
@@ -118,7 +119,7 @@ void ASWeapon::ServerAttachToASCharacter_Implementation(ASCharacter* Character)
 	SetActorRelativeRotation(FRotator::ZeroRotator);
 
 	CharOwner = Character;    // Avoid Casting
-	CharacterAnim = CharOwner->GetMesh()->GetAnimInstance();  	// Character Anim PTR For Reload Anim
+	// CharacterAnim = CharOwner->GetMesh()->GetAnimInstance; // DEPR Character Anim PTR For Reload Anim
 	OwnerPlayerController = Cast<APlayerController>(CharOwner->GetController()); 	// CAMERA SHAKE INITIALZIE
 	SetInstigator(Character);
 	SetOwner(Character);
@@ -498,24 +499,35 @@ bool ASWeapon::ServerFire_Validate()
 // RELOADING BLOCK
 void ASWeapon::InterruptReload()
 {
+	UAnimInstance* CharacterAnim = CharOwner->GetMesh()->GetAnimInstance();
 
 	if (CharacterAnim && ReloadAnimMontage) {
-
-		GetWorldTimerManager().ClearTimer(TimerHandle_FireCoolDown);
-
 		CharacterAnim->Montage_Stop(0.15f, ReloadAnimMontage);
-
-		bIsReloading = false;
-
 	}
+
+	ServerInterruptReload();
+}
+
+
+void ASWeapon::ServerInterruptReload_Implementation()
+{
+	GetWorldTimerManager().ClearTimer(TimerHandle_FireCoolDown);
+	bIsReloading = false;
 }
 
 
 void ASWeapon::FinishReload()
 {
 
-	AmmoCurrent = AmmoMax;
+	ServerFinishReload();
 
+}
+
+
+void ASWeapon::ServerFinishReload_Implementation()
+{
+
+	AmmoCurrent = AmmoMax;
 	bIsReloading = false;
 
 }
@@ -524,7 +536,7 @@ void ASWeapon::FinishReload()
 void ASWeapon::StartReload()
 {
 
-	if (bIsReloading || AmmoCurrent == AmmoMax)
+	/*if (bIsReloading || AmmoCurrent == AmmoMax)
 		return;
 
 	if (CharacterAnim && ReloadAnimMontage) {
@@ -536,8 +548,27 @@ void ASWeapon::StartReload()
 		GetWorldTimerManager().ClearTimer(TimerHandle_FireCoolDown);
 		GetWorldTimerManager().SetTimer(TimerHandle_FireCoolDown, this, &ASWeapon::FinishReload, AnimLength / ReloadMontageSpeedMultiplier);
 
-	}
+	}*/
+	
+	UAnimInstance* CharacterAnim = CharOwner->GetMesh()->GetAnimInstance();
 
+	if (CharacterAnim && ReloadAnimMontage)
+		CharacterAnim->Montage_Play(ReloadAnimMontage, ReloadAnimMontage->SequenceLength / ReloadSpeed);
+
+	ServerStartReload();
+
+}
+
+
+void ASWeapon::ServerStartReload_Implementation()
+{
+	if (bIsReloading || AmmoCurrent == AmmoMax)
+		return;
+	
+		bIsReloading = true;
+
+		GetWorldTimerManager().ClearTimer(TimerHandle_FireCoolDown);
+		GetWorldTimerManager().SetTimer(TimerHandle_FireCoolDown, this, &ASWeapon::FinishReload, ReloadSpeed);
 }
 
 
@@ -547,4 +578,8 @@ void ASWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetime
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(ASWeapon, CharOwner);
+	DOREPLIFETIME(ASWeapon, bIsReloading);
+	DOREPLIFETIME(ASWeapon, AmmoCurrent);
+	DOREPLIFETIME(ASWeapon, AmmoMax);
+	DOREPLIFETIME(ASWeapon, TimerHandle_FireCoolDown);
 }

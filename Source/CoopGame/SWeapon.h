@@ -420,11 +420,11 @@ public:
 		float CameraShakeScale = 1.0f;
 
 	/** Mag Ammo Capacity */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon: Ammo")
+	UPROPERTY(Replicated, EditAnywhere, BlueprintReadWrite, Category = "Weapon: Ammo")
 		int32 AmmoMax = 30;
 
 	/** Current Ammo in Mag */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon: Ammo")
+	UPROPERTY(Replicated, EditAnywhere, BlueprintReadWrite, Category = "Weapon: Ammo")
 		int32 AmmoCurrent = 30;
 
 	/** Monage Reload Speed Override, if 0 use Anim speed */
@@ -456,7 +456,9 @@ protected:
 	bool bShotIsDelayed;
 
 	float TimeSinceLastShot;
-	FTimerHandle TimerHandle_FireCoolDown;
+
+	UPROPERTY(Replicated)
+		FTimerHandle TimerHandle_FireCoolDown;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon: WeaponFX")
 		FName MuzzleSocketName = "Muzzle";
@@ -496,14 +498,17 @@ protected:
 	/** Fire Func resolving fire effects and base shoot logic (damage, spread, firerate, firemode, etc) common with all weapons. Better to override this and not Fire() */
 	virtual void FireLogic();
 
-	/**  RELOAD Multiplier for Montage_Play(). Calc with ReloadSpeed / ReloadAnimMontage->SequenceLength Default = 1.0 */
-	float ReloadMontageSpeedMultiplier = 1.0f;
+	/** DEPRECATED RELOAD Multiplier for Montage_Play(). Calc with ReloadSpeed / ReloadAnimMontage->SequenceLength Default = 1.0 */
+	//float ReloadMontageSpeedMultiplier = 1.0f;
 
 	/** RELOAD TimerHandler */
 	FTimerHandle TimerHandle_Reload;
 
 	/** RELOAD function called to complete reloading logic when anim montage is end playing */
 	void FinishReload();
+
+	UFUNCTION(Server, Reliable)
+		void ServerFinishReload();
 
 
 	/* SPREAD Calc Random Base Spread Angle For Shot */
@@ -515,8 +520,9 @@ protected:
 	 /* RECOIL Compensate Recoil */
 	 void CompensateRecoil(float DeltaSec);
 
-	 /** RELOAD Character Ownrer Anim Reference for reloading */
-	 UAnimInstance* CharacterAnim;
+	 // DEPR
+	 ///** RELOAD Character Ownrer Anim Reference for reloading */
+	 //UAnimInstance* CharacterAnim;
 
 	 /** CAMERA SHAKE player controller ref */
 	 APlayerController* OwnerPlayerController;
@@ -548,11 +554,17 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Weapon: Ammo")
 		virtual void StartReload();
 
+	UFUNCTION(Server, Reliable)
+		virtual void ServerStartReload();
+
 	UFUNCTION(BlueprintCallable, Category = "Weapon: Ammo")
 		virtual void InterruptReload();
 
+	UFUNCTION(Server, Reliable)
+		virtual void ServerInterruptReload();
+
 	/** True if weapon reloading in current time False if not */
-	UPROPERTY(BlueprintReadOnly, Category = "Weapon: Ammo")
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Weapon: Ammo")
 		bool bIsReloading;
 
 	/** IF key pressed true. else false */

@@ -17,6 +17,8 @@
 
 #include "Net/UnrealNetwork.h"
 
+#include "GameFramework/PlayerState.h"
+
 // Sets default values
 ASCharacter::ASCharacter()
 {
@@ -104,8 +106,9 @@ void ASCharacter::Tick(float DeltaTime)
 	}
 	else /* Positive Velocity Magnitude */
 	{
-		if (CharacterState == ECharacterState::Idle || CharacterState == ECharacterState::Falling)
-			SetState(ECharacterState::Run);
+		if (CharacterState == ECharacterState::Idle || CharacterState == ECharacterState::Falling ||
+			(CharacterState == ECharacterState::Run && bShouldSprinting))
+		SetState(ECharacterState::Run);
 	}
 	//
 
@@ -219,6 +222,10 @@ void ASCharacter::StopFire()
 
 void ASCharacter::BeginSprint()
 {
+	if (GetLocalRole() < ROLE_Authority) {
+		ServerBeginSprint();
+	}
+
 	GetCharacterMovement()->MaxWalkSpeed = SprintSpeed;
 	GetCharacterMovement()->bOrientRotationToMovement = true;
 	bUseControllerRotationYaw = false;
@@ -233,14 +240,31 @@ void ASCharacter::BeginSprint()
 }
 
 
+void ASCharacter::ServerBeginSprint_Implementation()
+{
+	BeginSprint();
+}
+
 void ASCharacter::EndSprint()
 {
+	if (GetLocalRole() < ROLE_Authority) {
+		ServerBeginSprint();
+	}
+
 	GetCharacterMovement()->MaxWalkSpeed = BaseSpeed;
 	GetCharacterMovement()->bOrientRotationToMovement = false;
 	bUseControllerRotationYaw = true;
 	bShouldSprinting = false;
 	SetState(ECharacterState::Run);
 }
+
+
+void ASCharacter::ServerEndSprint_Implementation()
+{
+	EndSprint();
+}
+
+
 
 FVector ASCharacter::GetPawnViewLocation() const
 {
@@ -298,12 +322,9 @@ void ASCharacter::EndCrouch()
 
 void ASCharacter::SpawnWeapon(TSubclassOf<ASWeapon> WeaponClass)
 {
-	if (GEngine /*&& IsLocallyControlled()*/)
+	if (GEngine)
 		GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Cyan, *FString::Printf(
 			TEXT("SpawnWeapon")));
-	
-	//if (GetLocalRole() < ROLE_Authority)
-	//	return;
 
 	ServerSpawnWeapon(WeaponClass);
 
@@ -320,39 +341,41 @@ void ASCharacter::ServerSpawnWeapon_Implementation(TSubclassOf<ASWeapon> WeaponC
 	SpawnedWeapon->AttachToASCharacter(this);
 }
 
+
 void ASCharacter::SetState(ECharacterState NewCharacterState)
 {
+
+	if (GetLocalRole() != ROLE_Authority)
+		ServerSetState(NewCharacterState);
 
 	if (CharacterState == NewCharacterState || CharacterState == ECharacterState::Dead)
 		return;
 
 	ECharacterState NewCharacterStateFiltered;
-
+	
 	// sprint resolve
 	if (NewCharacterState == ECharacterState::Run && bShouldSprinting && GetVelocity().Size() > BaseSpeed)
 		NewCharacterStateFiltered = ECharacterState::Sprint;
 	else
 		NewCharacterStateFiltered = NewCharacterState;
 
-	/*// next CharacterState after jumping can only falling
-	if (CharacterState == ECharacterState::Jumping && (NewCharacterState != ECharacterState::Falling || NewCharacterState != ECharacterState::Dead))
-	{
-	
-	}
-	else if (CharacterState == ECharacterState::Dead)
-	{
-		
-	}
-	else
-	{
-
-	}*/
-
 	CharacterState = NewCharacterStateFiltered;
+	if (GEngine)
+		GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Cyan, *FString::Printf(
+			TEXT("SetState id: %d, %s"), GetPlayerState()->GetPlayerId(), *DebugCharState(CharacterState)));
 
 	StateTime = 0.0f;
 	
 }
+
+
+void ASCharacter::ServerSetState_Implementation(ECharacterState NewCharacterState)
+{
+
+	SetState(NewCharacterState);
+
+}
+
 
 void ASCharacter::BeginJump()
 {
@@ -384,7 +407,6 @@ void ASCharacter::OnHealthChanged(USHealthComponent* OwningHealthComp, float Hea
 		EndZoom();
 
 		SetState(ECharacterState::Dead);
-		//CharacterState = ECharacterState::Dead;
 
 		// DetachFromControllerPendingDestroy();
 		Controller->UnPossess();
@@ -393,9 +415,6 @@ void ASCharacter::OnHealthChanged(USHealthComponent* OwningHealthComp, float Hea
 		bUseControllerRotationYaw = false;
 
 		SetLifeSpan(10.0f);
-
-		// GetMesh()->SetSimulatePhysics(true);
-
 	}
 
 }
@@ -406,4 +425,5 @@ void ASCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(ASCharacter, Weapon);
+	DOREPLIFETIME(ASCharacter, CharacterState);
 }
