@@ -365,6 +365,25 @@ struct FRecoilInput
 };
 
 
+// Contains information of a single hitscan weapon
+USTRUCT()
+struct FHitScanTrace
+{
+
+	GENERATED_BODY()
+	
+	UPROPERTY()
+		FVector_NetQuantize ImpactPoint;
+
+	UPROPERTY()
+		FVector_NetQuantize ImpactNormal;
+
+	UPROPERTY()
+		TEnumAsByte<EPhysicalSurface> HitSurfaceType;
+
+};
+
+
 UCLASS()
 class COOPGAME_API ASWeapon : public AActor
 {
@@ -586,5 +605,11 @@ public:
 		void ServerAttachToASCharacter(ASCharacter* Character);
 
 	virtual void BeginDestroy() override;
+
+	UPROPERTY(ReplicatedUsing = OnRep_HitScanTrace)
+		FHitScanTrace HitScanTrace;
+	
+	UFUNCTION()
+		void OnRep_HitScanTrace();
 
 };

@@ -322,11 +322,23 @@ void ASWeapon::FireLogic()
 
 		UGameplayStatics::ApplyPointDamage(HitActor, CurrentDamage, ShotDirection, LastHit, MyOwner->GetInstigatorController(), this, DamageType);
 
+	
+		// NET REPLICATION FOR SHOT EFFECT
+		if (GetLocalRole() == ROLE_Authority)
+		{
+			HitScanTrace.ImpactPoint = LastHit.ImpactPoint.Size() > 0.0f ? LastHit.ImpactPoint : LastHit.TraceEnd;
+			HitScanTrace.ImpactNormal = LastHit.ImpactNormal;
+			HitScanTrace.HitSurfaceType = SurfaceType;
+		}
+	
+	
 	} // Line Trace
+
 
 	// Shooting Modifiers On Shoot Modifier Resolve
 	SpreadModifiers.SetFireRateModifier(TimeSinceLastShot);
 	RecoilModifiers.SetFireRateModifier(TimeSinceLastShot);
+
 
 	// // DEBUG
 	if (DebugWeaponDrawing_Shot > 0) {
@@ -378,10 +390,32 @@ void ASWeapon::FireLogic()
 }
 
 
+void ASWeapon::OnRep_HitScanTrace()
+{
+	// Play cosmetic FX
+	PlayFireEffects();
+}
+
+
 void ASWeapon::PlayFireEffects()
 {
 
-	EPhysicalSurface SurfaceType = UPhysicalMaterial::DetermineSurfaceType(LastHit.PhysMaterial.Get());
+	EPhysicalSurface SurfaceType;
+	FVector ImpactPoint;
+	FVector ImpactNormal;
+
+	if (GetLocalRole() == ROLE_SimulatedProxy)
+	{
+		SurfaceType = HitScanTrace.HitSurfaceType;
+		ImpactPoint = HitScanTrace.ImpactPoint;
+		ImpactNormal = HitScanTrace.ImpactNormal;
+	}
+	else
+	{
+		SurfaceType = UPhysicalMaterial::DetermineSurfaceType(LastHit.PhysMaterial.Get());
+		ImpactPoint = LastHit.ImpactPoint.Size() > 0.0f ? ImpactPoint : LastHit.TraceEnd;
+		ImpactNormal = LastHit.ImpactNormal;
+	}
 
 	UParticleSystem* SelectedEffect;
 
@@ -397,7 +431,7 @@ void ASWeapon::PlayFireEffects()
 		break;
 	}
 
-	UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), SelectedEffect, LastHit.ImpactPoint, LastHit.ImpactNormal.Rotation());
+	UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), SelectedEffect, ImpactPoint, ImpactNormal.Rotation());
 
 	if (MuzzleEffect)
 		UGameplayStatics::SpawnEmitterAttached(MuzzleEffect, MeshComp, MuzzleSocketName);
@@ -409,7 +443,7 @@ void ASWeapon::PlayFireEffects()
 		UParticleSystemComponent* PSC = UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), TraceEffect, MuzzleLoc);
 
 		if (PSC)
-			PSC->SetVectorParameter(TargetTraceEffect, LastHit.ImpactPoint.Size() > 0.0f ? LastHit.ImpactPoint : LastHit.TraceEnd);
+			PSC->SetVectorParameter(TargetTraceEffect, ImpactPoint);
 	}
 
 	if (FireSound)
@@ -418,7 +452,6 @@ void ASWeapon::PlayFireEffects()
 	if (bCameraShaking && CameraShakeEffect && OwnerPlayerController) {
 		OwnerPlayerController->ClientPlayCameraShake(CameraShakeEffect, CameraShakeScale);
 	}
-
 }
 
 
@@ -582,4 +615,6 @@ void ASWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetime
 	DOREPLIFETIME(ASWeapon, AmmoCurrent);
 	DOREPLIFETIME(ASWeapon, AmmoMax);
 	DOREPLIFETIME(ASWeapon, TimerHandle_FireCoolDown);
+
+	DOREPLIFETIME(ASWeapon, HitScanTrace);
 }
