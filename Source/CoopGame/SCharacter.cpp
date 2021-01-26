@@ -344,8 +344,10 @@ void ASCharacter::ServerSpawnWeapon_Implementation(TSubclassOf<ASWeapon> WeaponC
 
 void ASCharacter::SetState(ECharacterState NewCharacterState)
 {
+	if (CharacterState == ECharacterState::Dead)
+		return;
 
-	if (GetLocalRole() != ROLE_Authority)
+	if (GetLocalRole() == ROLE_AutonomousProxy)
 		ServerSetState(NewCharacterState);
 
 	if (CharacterState == NewCharacterState || CharacterState == ECharacterState::Dead)
