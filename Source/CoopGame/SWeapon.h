@@ -376,9 +376,6 @@ struct FHitScanTrace
 		FVector_NetQuantize ImpactPoint;
 
 	UPROPERTY()
-		FVector_NetQuantize ImpactNormal;
-
-	UPROPERTY()
 		TEnumAsByte<EPhysicalSurface> HitSurfaceType;
 
 };
@@ -590,6 +587,7 @@ public:
 	bool bShouldFire;
 
 	void PlayFireEffects();
+	void PlayImpactEffects();
 	
 	uint32 ShotCount;
 
