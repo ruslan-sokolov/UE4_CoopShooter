@@ -109,9 +109,16 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Radial Damage", meta = (EditCondition = "bEnableRadialDamage"))
 		bool bDoFullDamage;
 
-	void explode();
+	void Explode();
 
-	bool bExploded;
+	UFUNCTION(Server, Reliable)
+		void ServerExplode();
+
+	UPROPERTY(ReplicatedUsing = OnRep_Exploded)
+		bool bExploded;
+
+	UFUNCTION()
+		void OnRep_Exploded();
 
 public:
 
@@ -119,4 +126,6 @@ public:
 		void OnHealthChanged(USHealthComponent* OwningHealthComp, float Health, float HealthDelta,
 			const class UDamageType* InstigatedDamageType, class AController* InstigatedBy, AActor* DamageCauser);
 
+	UFUNCTION()
+		void OnHealthChangedClient();
 };

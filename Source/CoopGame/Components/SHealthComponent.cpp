@@ -32,6 +32,7 @@ void USHealthComponent::BeginPlay()
 
 }
 
+
 void USHealthComponent::HandleTakeAnyDamage(AActor* DamagedActor, float Damage, const UDamageType* DamageType, AController* InstigatedBy, AActor* DamageCauser)
 {
 
@@ -47,6 +48,12 @@ void USHealthComponent::HandleTakeAnyDamage(AActor* DamagedActor, float Damage, 
 
 	OnHealthChanged.Broadcast(this, Health, Damage, DamageType, InstigatedBy, DamageCauser);
 
+}
+
+
+void USHealthComponent::OnRep_Health()
+{
+	OnHealthChangedClient.Broadcast();
 }
 
 
