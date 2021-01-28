@@ -87,10 +87,6 @@ void ASCharacter::Tick(float DeltaTime)
 	CameraComp->SetFieldOfView(NewFOV);
 	//
 
-	// Debug velocity
-	//if (GEngine)
-	//	GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, *FString::Printf(TEXT("Velocity: %s size: %f"), *GetVelocity().ToString(), GetVelocity().Size()));
-	//
 
 	// Movement State
 	StateTime += DeltaTime;
@@ -106,9 +102,13 @@ void ASCharacter::Tick(float DeltaTime)
 	}
 	else /* Positive Velocity Magnitude */
 	{
-		if (CharacterState == ECharacterState::Idle || CharacterState == ECharacterState::Falling ||
-			(CharacterState == ECharacterState::Run && bShouldSprinting))
-		SetState(ECharacterState::Run);
+		if (CharacterState == ECharacterState::Run)
+		{
+			if (bShouldSprinting && GetVelocity().Size() > BaseSpeed)
+				SetState(ECharacterState::Sprint);
+		}
+		else if (CharacterState == ECharacterState::Idle || CharacterState == ECharacterState::Falling)
+			SetState(ECharacterState::Run);
 	}
 	//
 
@@ -222,7 +222,7 @@ void ASCharacter::StopFire()
 
 void ASCharacter::BeginSprint()
 {
-	if (GetLocalRole() < ROLE_Authority) {
+	if (GetLocalRole() == ROLE_AutonomousProxy) {
 		ServerBeginSprint();
 	}
 
@@ -247,8 +247,8 @@ void ASCharacter::ServerBeginSprint_Implementation()
 
 void ASCharacter::EndSprint()
 {
-	if (GetLocalRole() < ROLE_Authority) {
-		ServerBeginSprint();
+	if (GetLocalRole() == ROLE_AutonomousProxy) {
+		ServerEndSprint();
 	}
 
 	GetCharacterMovement()->MaxWalkSpeed = BaseSpeed;
@@ -344,29 +344,19 @@ void ASCharacter::ServerSpawnWeapon_Implementation(TSubclassOf<ASWeapon> WeaponC
 
 void ASCharacter::SetState(ECharacterState NewCharacterState)
 {
-	if (CharacterState == ECharacterState::Dead)
+	if (NewCharacterState == CharacterState || CharacterState == ECharacterState::Dead)
 		return;
+
+	CharacterState = NewCharacterState;
 
 	if (GetLocalRole() == ROLE_AutonomousProxy)
 		ServerSetState(NewCharacterState);
 
-	if (CharacterState == NewCharacterState || CharacterState == ECharacterState::Dead)
-		return;
+	StateTime = 0.0f;
 
-	ECharacterState NewCharacterStateFiltered;
-	
-	// sprint resolve
-	if (NewCharacterState == ECharacterState::Run && bShouldSprinting && GetVelocity().Size() > BaseSpeed)
-		NewCharacterStateFiltered = ECharacterState::Sprint;
-	else
-		NewCharacterStateFiltered = NewCharacterState;
-
-	CharacterState = NewCharacterStateFiltered;
 	if (GEngine)
 		GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Cyan, *FString::Printf(
-			TEXT("SetState id: %d, %s"), GetPlayerState()->GetPlayerId(), *DebugCharState(CharacterState)));
-
-	StateTime = 0.0f;
+			TEXT("SetState id: %d, %s"), GetPlayerState()->GetPlayerId(), *DebugCharState(NewCharacterState)));
 	
 }
 
@@ -374,7 +364,7 @@ void ASCharacter::SetState(ECharacterState NewCharacterState)
 void ASCharacter::ServerSetState_Implementation(ECharacterState NewCharacterState)
 {
 
-	SetState(NewCharacterState);
+	CharacterState = NewCharacterState;
 
 }
 
@@ -427,5 +417,5 @@ void ASCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(ASCharacter, Weapon);
-	DOREPLIFETIME(ASCharacter, CharacterState);
+	DOREPLIFETIME_CONDITION(ASCharacter, CharacterState, COND_SimulatedOnly);
 }

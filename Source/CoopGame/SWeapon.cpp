@@ -106,7 +106,7 @@ void ASWeapon::AttachToASCharacter(ASCharacter* Character)
 void ASWeapon::ServerAttachToASCharacter_Implementation(ASCharacter* Character)
 {
 
-	if (!Character || Character->CharacterState == ECharacterState::Dead) {
+	if (!Character || Character->GetState() == ECharacterState::Dead) {
 		UE_LOG(LogTemp, Warning, TEXT("Attempt to attach weapon to invalid character"))
 			return;
 	}
@@ -166,7 +166,7 @@ void ASWeapon::Tick(float DeltaTime)
 	if (CharOwner)
 	{
 		float VelocityModifierNormalized = CharOwner->GetVelocity().Size() / CharOwner->BaseSpeed;
-		CharacterAimPose Pos = CharStateToAimPose(CharOwner->CharacterState);
+		CharacterAimPose Pos = CharStateToAimPose(CharOwner->GetState());
 
 		SpreadModifiers.SetPosModifier(Pos);
 		RecoilModifiers.SetPosModifier(Pos);

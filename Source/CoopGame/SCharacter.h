@@ -36,7 +36,7 @@ enum class ECharacterState : uint8
 	VehiclePilot UMETA(DisplayName = "VehiclePilot"), // not used yet
 	VehiclePassenger UMETA(DisplayName = "VehiclePassenger"), // not used yet
 
-	Dead UMETA(DisplayName = "Dead"), // not used yet
+	Dead UMETA(DisplayName = "Dead")
 
 };
 
@@ -92,6 +92,8 @@ protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 	
+	// Components Block
+
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Components")
 		UCameraComponent* CameraComp;
 	
@@ -101,6 +103,10 @@ protected:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Components")
 		USHealthComponent* HealthComp;
 
+	//
+
+	// Parameters block
+
 	/** Character Speed while sprinting **/
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Character Movement: Sprint")
 		float SprintSpeed = 720.0f;
@@ -108,6 +114,10 @@ protected:
 	/** Default weapon class to spawn with player  **/
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Character: Combat")
 		TSubclassOf<ASWeapon> WeaponClassToSpawnWith;
+
+	//
+
+	// Zoom Block
 
 	bool bWantsToZoom;
 
@@ -122,12 +132,29 @@ protected:
 	/* Default FOV Set During Begin Play */
 	float DefaultFOV;
 
+	//
+
+	// Character State BLOCK
+
+	/** Current CharacterState */
+	UPROPERTY(Replicated)
+		ECharacterState CharacterState;
+
+	/** Method called to change current character State */
+	UFUNCTION(BlueprintCallable, Category = "Chracter: State")
+		void SetState(ECharacterState NewState);
+
+	UFUNCTION(Server, Unreliable)
+		void ServerSetState(ECharacterState NewState);
+
+	//
+
 public:	
-	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
-	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+
+	// movement actions block
 
 	void MoveForward(float Val);
 	void MoveRight(float Val);
@@ -145,49 +172,32 @@ public:
 	UFUNCTION(Server, Unreliable)
 		void ServerEndSprint();
 
+	float BaseSpeed;
+
+	void BeginJump();
+
+	//
+
+	// fire actions block
+
 	void BeginZoom();
 	void EndZoom();
 
 	void Fire();
+	void StopFire();
 
 	void Reload();
 
-	void StopFire();
-
-	virtual FVector GetPawnViewLocation() const override;
-
+	/** Spawning and Attaching weapon to character */
 	UFUNCTION(BlueprintCallable, Category = "Chracter: Combat")
 		void SpawnWeapon(TSubclassOf<ASWeapon> WeaponClass);
 
 	UFUNCTION(Server, Reliable)
 		void ServerSpawnWeapon(TSubclassOf<ASWeapon> WeaponClass);
 
-	UFUNCTION()
-		void OnHealthChanged(USHealthComponent* OwningHealthComp, float Health, float HealthDelta,
-			const class UDamageType* DamageType, class AController* InstigatedBy, AActor* DamageCauser);
-
-	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Chracter: State")
-		ECharacterState CharacterState;
-
-	UFUNCTION(BlueprintCallable, Category = "Chracter: State")
-		void SetState(ECharacterState NewState);
-
-	UFUNCTION(Server, Unreliable)
-		void ServerSetState(ECharacterState NewState);
-
-	void BeginJump();
-
-	/** Current State Active Time* */
-	UPROPERTY(BlueprintReadOnly, Category = "Chracter: State")
-		float StateTime;
-
 	/** Carried Weapon Speed modifier **/
 	UPROPERTY(BlueprintReadOnly, Category = "Chracter: Combat")
 		float CarriedWeaponSpeedModifier = 1.0f;
-
-	bool bShouldSprinting;
-
-	float BaseSpeed;
 
 	/** Weapon Attachment SocketName **/
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Chracter: Combat")
@@ -197,4 +207,29 @@ public:
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Chracter: Combat")
 		ASWeapon* Weapon;
 
+	//
+
+	// Character State Block
+
+	virtual FVector GetPawnViewLocation() const override;
+
+	bool bShouldSprinting;
+
+	/** Get Current Character State */
+	UFUNCTION(BlueprintCallable, Category = "Character: State")
+		FORCEINLINE ECharacterState GetState() const { return CharacterState; }
+
+	/** Current State Active Time* */
+	UPROPERTY(BlueprintReadOnly, Category = "Chracter: State")
+		float StateTime;
+
+	//
+
+	// Events block
+
+	UFUNCTION()
+		void OnHealthChanged(USHealthComponent* OwningHealthComp, float Health, float HealthDelta,
+			const class UDamageType* DamageType, class AController* InstigatedBy, AActor* DamageCauser);
+	
+	//
 };

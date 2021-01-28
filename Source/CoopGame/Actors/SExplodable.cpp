@@ -25,11 +25,7 @@ ASExplodable::ASExplodable()
 
 	HealthComp = CreateDefaultSubobject<USHealthComponent>(TEXT("HealthComp"));
 	HealthComp->DefaultHealth = 100.f;
-	if (GetLocalRole() == ROLE_Authority)
-		HealthComp->OnHealthChanged.AddDynamic(this, &ASExplodable::OnHealthChanged);
-	else
-		HealthComp->OnHealthChangedClient.AddDynamic(this, &ASExplodable::OnHealthChangedClient);
-	
+
 	RadialForceComp = CreateDefaultSubobject<URadialForceComponent>(TEXT("RadialForceComp"));
 	RadialForceComp->SetupAttachment(RootComponent);
 	RadialForceComp->SetAutoActivate(false);
@@ -60,6 +56,11 @@ ASExplodable::ASExplodable()
 void ASExplodable::BeginPlay()
 {
 	Super::BeginPlay();
+
+	if (GetLocalRole() == ROLE_Authority)
+		HealthComp->OnHealthChanged.AddDynamic(this, &ASExplodable::OnHealthChanged);
+	else
+		HealthComp->OnHealthChangedClient.AddDynamic(this, &ASExplodable::OnHealthChangedClient);
 	
 }
 
@@ -130,19 +131,7 @@ void ASExplodable::OnHealthChanged(USHealthComponent* OwningHealthComp, float He
 void ASExplodable::OnHealthChangedClient()
 {
 	if (HealthComp->GetHealth() != 0.0f)
-	{
 		SoundHit->Play();
-	}
-	else 
-	{
-
-		if (ExplodedMaterial)
-			MeshComp->SetMaterial(0, ExplodedMaterial);
-
-		SoundExplode->Play();
-		ExplodeFX->Activate(true);
-	
-	}
 }
 
 
