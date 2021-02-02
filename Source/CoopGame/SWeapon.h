@@ -514,8 +514,7 @@ protected:
 	/** Fire Func resolving fire effects and base shoot logic (damage, spread, firerate, firemode, etc) common with all weapons. Better to override this and not Fire() */
 	virtual void FireLogic();
 
-	/** DEPRECATED RELOAD Multiplier for Montage_Play(). Calc with ReloadSpeed / ReloadAnimMontage->SequenceLength Default = 1.0 */
-	//float ReloadMontageSpeedMultiplier = 1.0f;
+	// RELOAD BLOCK
 
 	/** RELOAD TimerHandler */
 	FTimerHandle TimerHandle_Reload;
@@ -526,6 +525,11 @@ protected:
 	UFUNCTION(Server, Reliable)
 		void ServerFinishReload();
 
+	void PlayReloadAnim();
+
+	void StopReloadAnim();
+
+	// RELOAD BLOCK END
 
 	/* SPREAD Calc Random Base Spread Angle For Shot */
 	 FRotator CalcSpread();
@@ -546,6 +550,11 @@ protected:
 	 /* SPREAD Character ref to get velocity for spread cal etc */
 	 UPROPERTY(Replicated)
 		ASCharacter* CharOwner;
+
+	 void WeaponLogicTick();
+	 
+	 UFUNCTION(Server, Unreliable)
+		 void ServerWeaponLogicTick();
 
 public:
 	
@@ -579,9 +588,12 @@ public:
 	UFUNCTION(Server, Reliable)
 		virtual void ServerInterruptReload();
 
-	/** True if weapon reloading in current time False if not */
-	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Weapon: Ammo")
+	/** True if weapon reloading in current time False if not also used for anim reload replication */
+	UPROPERTY(ReplicatedUsing = OnRep_Reloading, BlueprintReadOnly, Category = "Weapon: Ammo")
 		bool bIsReloading;
+
+	UFUNCTION()
+		void OnRep_Reloading();
 
 	/** IF key pressed true. else false */
 	bool bShouldFire;

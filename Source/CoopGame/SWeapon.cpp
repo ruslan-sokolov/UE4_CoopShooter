@@ -163,8 +163,24 @@ void ASWeapon::Tick(float DeltaTime)
 	DrawDebugString(GetWorld(), Loc, *FString::Printf(TEXT("%d / %d"), AmmoCurrent, AmmoMax), (AActor*)0, FColor::White, DeltaTime);
 	//
 
-	if (CharOwner)
+	WeaponLogicTick();
+
+}
+
+
+void ASWeapon::WeaponLogicTick()
+{
+
+	if (!CharOwner)
+		return;
+
+	if (CharOwner->GetLocalRole() == ROLE_AutonomousProxy)
+		ServerWeaponLogicTick();
+
+	else if (CharOwner->GetLocalRole() == ROLE_Authority)
 	{
+		float DeltaTime = GetWorld()->GetDeltaSeconds();
+
 		float VelocityModifierNormalized = CharOwner->GetVelocity().Size() / CharOwner->BaseSpeed;
 		CharacterAimPose Pos = CharStateToAimPose(CharOwner->GetState());
 
@@ -192,6 +208,13 @@ void ASWeapon::Tick(float DeltaTime)
 				SpreadModifiers.CurrentTotalModifier, CurrentSpreadAngle));
 		//
 	}
+
+}
+
+
+void ASWeapon::ServerWeaponLogicTick_Implementation()
+{
+	WeaponLogicTick();
 }
 
 
@@ -449,7 +472,12 @@ void ASWeapon::OnRep_HitScanTrace()
 void ASWeapon::Fire()
 {
 
-	if (GetLocalRole() < ROLE_Authority)
+	if (GetLocalRole() == ROLE_SimulatedProxy)
+	{
+
+	}
+
+	if (GetLocalRole() == ROLE_AutonomousProxy)
 	{
 		ServerFire();
 		return;
@@ -509,10 +537,10 @@ void ASWeapon::Fire()
 
 void ASWeapon::ServerFire_Implementation()
 {
-	//Fire();
-	FireLogic();
-	PlayFireEffects();
-	PlayImpactEffects();
+	Fire();
+	//FireLogic();
+	//PlayFireEffects();
+	//PlayImpactEffects();
 
 }
 
@@ -524,23 +552,59 @@ bool ASWeapon::ServerFire_Validate()
 
 
 // RELOADING BLOCK
-void ASWeapon::InterruptReload()
-{
-	UAnimInstance* CharacterAnim = CharOwner->GetMesh()->GetAnimInstance();
 
-	if (CharacterAnim && ReloadAnimMontage) {
-		CharacterAnim->Montage_Stop(0.15f, ReloadAnimMontage);
+void ASWeapon::PlayReloadAnim()  
+{
+	if (CharOwner)
+	{
+		UAnimInstance* CharacterAnim = CharOwner->GetMesh()->GetAnimInstance();
+
+		if (CharacterAnim && ReloadAnimMontage)
+			CharacterAnim->Montage_Play(ReloadAnimMontage, ReloadAnimMontage->SequenceLength / ReloadSpeed);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("ASWeapon::PlayReloadAnim NOT FOUND CharOwner !!"));
 	}
 
+}  // play reload anim
+
+
+void ASWeapon::StopReloadAnim()
+{
+	if (CharOwner)
+	{
+		UAnimInstance* CharacterAnim = CharOwner->GetMesh()->GetAnimInstance();
+
+		if (CharacterAnim && ReloadAnimMontage) {
+			CharacterAnim->Montage_Stop(0.15f, ReloadAnimMontage);
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("ASWeapon::PlayReloadAnim NOT FOUND CharOwner !!"));
+	}
+
+}  // stop reload anim
+
+void ASWeapon::InterruptReload()
+{
+	if (GetLocalRole() != ROLE_Authority)
+		StopReloadAnim();
+
 	ServerInterruptReload();
-}
+
+}  // interrupt reload
 
 
 void ASWeapon::ServerInterruptReload_Implementation()
 {
+	StopReloadAnim(); // stop anim if server also is client
+
 	GetWorldTimerManager().ClearTimer(TimerHandle_FireCoolDown);
 	bIsReloading = false;
-}
+
+}  // server interrupt reload
 
 
 void ASWeapon::FinishReload()
@@ -548,7 +612,7 @@ void ASWeapon::FinishReload()
 
 	ServerFinishReload();
 
-}
+}  // finish reload
 
 
 void ASWeapon::ServerFinishReload_Implementation()
@@ -557,46 +621,48 @@ void ASWeapon::ServerFinishReload_Implementation()
 	AmmoCurrent = AmmoMax;
 	bIsReloading = false;
 
-}
+}  // server finish reload
 
 
 void ASWeapon::StartReload()
-{
-
-	/*if (bIsReloading || AmmoCurrent == AmmoMax)
+{	
+	if (bIsReloading || AmmoCurrent == AmmoMax)  // client check (same as server check)
 		return;
 
-	if (CharacterAnim && ReloadAnimMontage) {
-		
-		bIsReloading = true;
-
-		float AnimLength = CharacterAnim->Montage_Play(ReloadAnimMontage, ReloadMontageSpeedMultiplier);
-
-		GetWorldTimerManager().ClearTimer(TimerHandle_FireCoolDown);
-		GetWorldTimerManager().SetTimer(TimerHandle_FireCoolDown, this, &ASWeapon::FinishReload, AnimLength / ReloadMontageSpeedMultiplier);
-
-	}*/
-	
-	UAnimInstance* CharacterAnim = CharOwner->GetMesh()->GetAnimInstance();
-
-	if (CharacterAnim && ReloadAnimMontage)
-		CharacterAnim->Montage_Play(ReloadAnimMontage, ReloadAnimMontage->SequenceLength / ReloadSpeed);
+	if (GetLocalRole() != ROLE_Authority)
+		PlayReloadAnim();
 
 	ServerStartReload();
 
-}
+}  // start reload
 
 
 void ASWeapon::ServerStartReload_Implementation()
 {
-	if (bIsReloading || AmmoCurrent == AmmoMax)
+	if (bIsReloading || AmmoCurrent == AmmoMax)  // server check (same as client)
 		return;
-	
-		bIsReloading = true;
+		
+	PlayReloadAnim();  // play anim if server also is client
 
-		GetWorldTimerManager().ClearTimer(TimerHandle_FireCoolDown);
-		GetWorldTimerManager().SetTimer(TimerHandle_FireCoolDown, this, &ASWeapon::FinishReload, ReloadSpeed);
-}
+	bIsReloading = true;
+
+	GetWorldTimerManager().ClearTimer(TimerHandle_FireCoolDown);
+	GetWorldTimerManager().SetTimer(TimerHandle_FireCoolDown, this, &ASWeapon::FinishReload, ReloadSpeed);
+
+}  // server start reload
+
+
+void ASWeapon::OnRep_Reloading()
+{
+	if (bIsReloading)
+	{
+		PlayReloadAnim();
+	}
+	else
+	{
+		StopReloadAnim();
+	}
+}  // replication reload
 
 
 // NETWORKING REPLICATION
@@ -605,7 +671,7 @@ void ASWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetime
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(ASWeapon, CharOwner);
-	DOREPLIFETIME(ASWeapon, bIsReloading);
+	DOREPLIFETIME_CONDITION(ASWeapon, bIsReloading, COND_SkipOwner);
 	DOREPLIFETIME(ASWeapon, AmmoCurrent);
 	DOREPLIFETIME(ASWeapon, AmmoMax);
 	DOREPLIFETIME(ASWeapon, TimerHandle_FireCoolDown);

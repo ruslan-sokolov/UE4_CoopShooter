@@ -33,7 +33,8 @@ void USHealthComponent::BeginPlay()
 }
 
 
-void USHealthComponent::HandleTakeAnyDamage(AActor* DamagedActor, float Damage, const UDamageType* DamageType, AController* InstigatedBy, AActor* DamageCauser)
+void USHealthComponent::HandleTakeAnyDamage(AActor* DamagedActor, float Damage, 
+	const UDamageType* DamageType, AController* InstigatedBy, AActor* DamageCauser)
 {
 
 	if (Damage <= 0.0f)
