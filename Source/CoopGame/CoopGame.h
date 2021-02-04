@@ -11,3 +11,5 @@
 
 #define ONE_METER					100.0f
 #define ONE_HUNDRED_METERS			10000.0f
+
+#define WEAPON_TICK					1.0f / 60.0f

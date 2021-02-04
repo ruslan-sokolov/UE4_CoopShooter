@@ -365,7 +365,7 @@ struct FRecoilInput
 };
 
 
-// Contains information of a single hitscan weapon
+// Contains information of a single hitscan weapon (for replication usage)
 USTRUCT()
 struct FHitScanTrace
 {
@@ -387,9 +387,13 @@ class COOPGAME_API ASWeapon : public AActor
 	GENERATED_BODY()
 	
 public:	
-	// Sets default values for this actor's properties
 	ASWeapon();
+	virtual void Tick(float DeltaTime) override;
 
+protected:
+	virtual void BeginPlay() override;
+
+public:
 	/**  Temporarly Change Player Camera FOV when aiming. 0 - don't change fov */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Weapon: Aim")
 		float ZoomFOV = 60.0f;
@@ -406,11 +410,11 @@ public:
 		float SpreadBaseAngle = 5.0f;
 
 	/** Actual current calculated Spread Angle for shot placement and Crosshair UMG Dynamic effect. */
-	UPROPERTY(BlueprintReadOnly, Category = "Weapon: Aim")
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Weapon: Aim")
 		float CurrentSpreadAngle;
 
 	/**  Recoil Parameters */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Weapon: Aim")
+	UPROPERTY(Replicated, EditDefaultsOnly, BlueprintReadWrite, Category = "Weapon: Aim")
 		FRecoilInput RecoilParams;
 
 	/**  Base Weapon Damage */
@@ -420,14 +424,6 @@ public:
 	/**  HeadShot Damage Multiplier */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Weapon: Fire")
 		float HeadshotDamageMultiplier = 16.0f;
-
-	/**  Weapon Fire rate in sec. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Weapon: Fire")
-		float FireRate = 0.12;
-
-	/** Weapon Fire Mode */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Weapon: Fire")
-		WeaponFireMode FireMode = WeaponFireMode::Semiauto;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon: Aim")
 		bool bCameraShaking = true;
@@ -442,39 +438,17 @@ public:
 	/** Current Ammo in Mag */
 	UPROPERTY(Replicated, EditAnywhere, BlueprintReadWrite, Category = "Weapon: Ammo")
 		int32 AmmoCurrent = 30;
-
-	/** Monage Reload Speed Override, if 0 use Anim speed */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon: Ammo")
-		float ReloadSpeed;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon: Ammo")
-		UAnimMontage* ReloadAnimMontage;
 	
 	/** Change Weapon Owner Speed */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Owner: Speed")
 		float CharacterSpeedModifier = 0.95f;
 
 protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
-
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
 		USkeletalMeshComponent* MeshComp;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon: Fire")
 		TSubclassOf<UDamageType> DamageType;
-
-	/** IF true then when we press shot when cooldown still not complete - shot will be placed as soon as cd finished */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Weapon: Fire")
-		bool bShotCanBeDelayed = true;
-
-	/** Semiauto mode smooth fire rate. */
-	bool bShotIsDelayed;
-
-	float TimeSinceLastShot;
-
-	UPROPERTY(Replicated)
-		FTimerHandle TimerHandle_FireCoolDown;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon: WeaponFX")
 		FName MuzzleSocketName = "Muzzle";
@@ -506,15 +480,54 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon: WeaponFX", meta = (EditCondition = "bCameraShaking"))
 		TSubclassOf<UCameraShake> CameraShakeEffect;
 
-	UFUNCTION()
-		void SemiAutoFireTimerBind(bool ShotDelayed);
+	/* SPREAD Calc Random Base Spread Angle For Shot */
+	 FRotator CalcSpread();
 
-	FTimerDelegate SemiAutoFireTimerDel;
+	 /* RECOIL Add Recoil After Shot */
+	 void AddRecoil();
 
-	/** Fire Func resolving fire effects and base shoot logic (damage, spread, firerate, firemode, etc) common with all weapons. Better to override this and not Fire() */
-	virtual void FireLogic();
+	 /* RECOIL Compensate Recoil */
+	 void CompensateRecoil(float DeltaSec);
 
-	// RELOAD BLOCK
+	 /** CAMERA SHAKE player controller ref */
+	 APlayerController* OwnerPlayerController;
+
+	 /* SPREAD Character ref to get velocity for spread cal etc */
+	 UPROPERTY(Replicated)
+		ASCharacter* CharOwner;
+
+public:
+	/** Player Pose Recoil Multiplier */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon: Aim")
+		FCharacterShootModifiers SpreadModifiers;
+
+	/** Player Pose Spread Multiplier */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon: Aim")
+		FCharacterShootModifiers RecoilModifiers;
+
+	/** Current Crosshair To Override */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon: UMG")
+		TSubclassOf<class USCrosshairWidget> CrosshairOverride;
+
+	/** Attach Weapon To Character */
+	UFUNCTION(BlueprintCallable, Category = "Weapon: Use")
+		void AttachToASCharacter(ASCharacter* Character);
+
+	UFUNCTION(Server, Reliable)
+		void ServerAttachToASCharacter(ASCharacter* Character);
+
+	virtual void BeginDestroy() override;
+
+
+protected:
+	// PROTECTED RELOAD BLOCK ////////////////////////////////////////////////////////////////////////////////////////////
+
+	/** Monage Reload Speed Override, if 0 use Anim speed */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon: Ammo")
+		float ReloadSpeed;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon: Ammo")
+		UAnimMontage* ReloadAnimMontage;
 
 	/** RELOAD TimerHandler */
 	FTimerHandle TimerHandle_Reload;
@@ -529,52 +542,10 @@ protected:
 
 	void StopReloadAnim();
 
-	// RELOAD BLOCK END
-
-	/* SPREAD Calc Random Base Spread Angle For Shot */
-	 FRotator CalcSpread();
-
-	 /* RECOIL Add Recoil After Shot */
-	 void AddRecoil();
-
-	 /* RECOIL Compensate Recoil */
-	 void CompensateRecoil(float DeltaSec);
-
-	 // DEPR
-	 ///** RELOAD Character Ownrer Anim Reference for reloading */
-	 //UAnimInstance* CharacterAnim;
-
-	 /** CAMERA SHAKE player controller ref */
-	 APlayerController* OwnerPlayerController;
-
-	 /* SPREAD Character ref to get velocity for spread cal etc */
-	 UPROPERTY(Replicated)
-		ASCharacter* CharOwner;
-
-	 void WeaponLogicTick();
-	 
-	 UFUNCTION(Server, Unreliable)
-		 void ServerWeaponLogicTick();
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 public:
-	
-	/** Player Pose Recoil Multiplier */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon: Aim")
-		FCharacterShootModifiers SpreadModifiers;
-
-	/** Player Pose Spread Multiplier */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon: Aim")
-		FCharacterShootModifiers RecoilModifiers;
-
-	/** Current Crosshair To Override */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon: UMG")
-		TSubclassOf<class USCrosshairWidget> CrosshairOverride;
-
-	UFUNCTION(BlueprintCallable, Category = "Weapon: Fire")
-		virtual void Fire();
-
-	UFUNCTION(Server, Reliable, WithValidation)
-		void ServerFire();
+	// PUBLIC RELOAD BLOCK ///////////////////////////////////////////////////////////////////////////////////////////////
 
 	UFUNCTION(BlueprintCallable, Category = "Weapon: Ammo")
 		virtual void StartReload();
@@ -595,31 +566,100 @@ public:
 	UFUNCTION()
 		void OnRep_Reloading();
 
-	/** IF key pressed true. else false */
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+protected:
+	// PROTECTED FIRE BLOCK //////////////////////////////////////////////////////////////////////////////////////////////
+
+	 /** IF key pressed true. else false */
 	bool bShouldFire;
+
+
+	void WeaponLogicTick();
+	void EnableWeaponLogicTick(bool Enable);
+	FTimerHandle TimerHandle_WeaponTick;
+
+
+	UFUNCTION()
+		void SemiAutoFireTimerBind(bool ShotDelayed);
+
+	FTimerDelegate SemiAutoFireTimerDel;
+
+	/** Fire Func resolving fire effects and base shoot logic (damage, spread, firerate, firemode, etc) common with all weapons. Better to override this and not Fire() */
+	virtual void FireLogic();
+
+
+	/** IF true then when we press shot when cooldown still not complete - shot will be placed as soon as cd finished */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Weapon: Fire")
+		bool bShotCanBeDelayed = true;
+
+	/** Semiauto mode smooth fire rate. */
+	bool bShotIsDelayed;
+
+	float TimeSinceLastShot;
+
+	FTimerHandle TimerHandle_FireCoolDown;
+
+	UFUNCTION(Server, Reliable)
+		void ServerSetShouldFire(bool val);
+
+	FORCEINLINE void ServerSetShouldFire_Implementation(bool val) { bShouldFire = val; }
+
+	UFUNCTION(Server, Reliable, WithValidation)
+		void ServerFire();
+
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+public:
+	// PUBLIC FIRE BLOCK //////////////////////////////////////////////////////////////////////////////////////////////
+	
+	/** Used for character controller initialze weapon fire action */
+	FORCEINLINE void SetShouldFire(bool val) { bShouldFire = val;  ServerSetShouldFire(val); }
+
+	UFUNCTION(BlueprintCallable, Category = "Weapon: Fire")
+		virtual void Fire();
 
 	void PlayFireEffects();
 	void PlayImpactEffects();
-	
-	uint32 ShotCount;
 
+
+	uint32 ShotCount;
 	FHitResult LastHit;
 
-	virtual void Tick(float DeltaTime) override;
-
-	/** Attach Weapon To Character */
-	UFUNCTION(BlueprintCallable, Category = "Weapon: Use")
-		void AttachToASCharacter(ASCharacter* Character);
-
-	UFUNCTION(Server, Reliable)
-		void ServerAttachToASCharacter(ASCharacter* Character);
-
-	virtual void BeginDestroy() override;
 
 	UPROPERTY(ReplicatedUsing = OnRep_HitScanTrace)
 		FHitScanTrace HitScanTrace;
-	
+
 	UFUNCTION()
 		void OnRep_HitScanTrace();
+
+	/**  Weapon Fire rate in sec. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Weapon: Fire")
+		float FireRate = 0.12;
+
+	/** Weapon Fire Mode */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Weapon: Fire")
+		WeaponFireMode FireMode = WeaponFireMode::Semiauto;
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+protected:
+	// PROTECTED AIM BLOCK //////////////////////////////////////////////////////////////////////////////////////////////
+
+	UFUNCTION(Server, Reliable)
+		void ServerSetShouldAim(bool Val);
+
+	FORCEINLINE void ServerSetShouldAim_Implementation(bool Val)
+	{
+		SpreadModifiers.SetAimingModifier(Val); RecoilModifiers.SetAimingModifier(Val);
+	}
+
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+public:
+	// PUBLIC AIM BLOCK //////////////////////////////////////////////////////////////////////////////////////////////
+
+	FORCEINLINE void SetShouldAim(bool Val) { ServerSetShouldAim(Val); }
+
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 };

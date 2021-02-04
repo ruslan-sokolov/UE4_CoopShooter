@@ -23,6 +23,8 @@
 
 #include "Net/UnrealNetwork.h"
 
+#include "CoopGame.h"
+
 
 FAutoConsoleVariableRef CVARDebugWeaponDrawing_Shot(
 	TEXT("COOP.DebugWeapons.Shot"),
@@ -68,9 +70,34 @@ ASWeapon::ASWeapon()
 	SetReplicates(true);
 	SetReplicateMovement(true);
 
-	NetUpdateFrequency = 66.0f;
-	MinNetUpdateFrequency = 33.0f;
+	NetUpdateFrequency = 60.0f;
+	MinNetUpdateFrequency = 30.0f;
 
+	// RELOAD ANIM SPEED MODIFIER INITIALIZE
+	if (ReloadSpeed < 0.0f)
+		// ReloadMontageSpeedMultiplier = ReloadAnimMontage->SequenceLength / ReloadSpeed;
+		ReloadSpeed = ReloadAnimMontage->SequenceLength;
+
+}
+
+
+void ASWeapon::BeginDestroy()
+{
+	Super::BeginDestroy();
+
+	// InterruptReload();
+
+	if (CharOwner) {
+		CharOwner->CarriedWeaponSpeedModifier = 1.0f;
+	}
+
+	// Weapon Crosshair Resolve
+	if (CrosshairOverride && OwnerPlayerController) {
+		ACoopHUD* HUD = Cast<ACoopHUD>(OwnerPlayerController->GetHUD());
+
+		if (HUD)
+			HUD->RestoreDefaultCrosshair();
+	}
 }
 
 
@@ -78,12 +105,22 @@ void ASWeapon::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// RELOAD ANIM SPEED MODIFIER INITIALIZE
-	if (ReloadSpeed < 0.0f)
-		// ReloadMontageSpeedMultiplier = ReloadAnimMontage->SequenceLength / ReloadSpeed;
-		ReloadSpeed = ReloadAnimMontage->SequenceLength;
 }
 
+
+void ASWeapon::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+
+	// DBG ammo
+	FVector Loc = MeshComp->GetSocketLocation(MuzzleSocketName);
+	Loc += GetActorForwardVector() * -30;
+	DrawDebugString(GetWorld(), Loc, *FString::Printf(TEXT("%d / %d"), AmmoCurrent, AmmoMax), (AActor*)0, FColor::White, DeltaTime);
+	//
+}
+
+
+// Character Attach BLOCK  ////////////////////////////////////////////////////////////////////////////////////////////
 
 void ASWeapon::AttachToASCharacter(ASCharacter* Character)
 {
@@ -92,7 +129,7 @@ void ASWeapon::AttachToASCharacter(ASCharacter* Character)
 	// Weapon Crosshair Resolve
 	if (CrosshairOverride && OwnerPlayerController) {
 		ACoopHUD* HUD = Cast<ACoopHUD>(OwnerPlayerController->GetHUD());
-		
+
 		if (HUD)
 			HUD->SetCrosshair(CrosshairOverride);
 	}
@@ -127,98 +164,15 @@ void ASWeapon::ServerAttachToASCharacter_Implementation(ASCharacter* Character)
 	SetInstigator(Character);
 	SetOwner(Character);
 
-}
-
-
-void ASWeapon::BeginDestroy()
-{
-	Super::BeginDestroy();
-
-	
-	// InterruptReload();
-
-	if (CharOwner) {
-		CharOwner->CarriedWeaponSpeedModifier = 1.0f;
-	}
-	
-	// Weapon Crosshair Resolve
-	if (CrosshairOverride && OwnerPlayerController) {
-		ACoopHUD* HUD = Cast<ACoopHUD>(OwnerPlayerController->GetHUD());
-
-		if (HUD)
-			HUD->RestoreDefaultCrosshair();
-	}
-}
-
-
-void ASWeapon::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-
-	TimeSinceLastShot += DeltaTime;
-	
-	// DBG ammo
-	FVector Loc = MeshComp->GetSocketLocation(MuzzleSocketName);
-	Loc += GetActorForwardVector() * -30;
-	DrawDebugString(GetWorld(), Loc, *FString::Printf(TEXT("%d / %d"), AmmoCurrent, AmmoMax), (AActor*)0, FColor::White, DeltaTime);
-	//
-
-	WeaponLogicTick();
+	EnableWeaponLogicTick(true);
 
 }
 
-
-void ASWeapon::WeaponLogicTick()
-{
-
-	if (!CharOwner)
-		return;
-
-	if (CharOwner->GetLocalRole() == ROLE_AutonomousProxy)
-		ServerWeaponLogicTick();
-
-	else if (CharOwner->GetLocalRole() == ROLE_Authority)
-	{
-		float DeltaTime = GetWorld()->GetDeltaSeconds();
-
-		float VelocityModifierNormalized = CharOwner->GetVelocity().Size() / CharOwner->BaseSpeed;
-		CharacterAimPose Pos = CharStateToAimPose(CharOwner->GetState());
-
-		SpreadModifiers.SetPosModifier(Pos);
-		RecoilModifiers.SetPosModifier(Pos);
-
-		SpreadModifiers.SetVelModifier(VelocityModifierNormalized);
-		RecoilModifiers.SetVelModifier(VelocityModifierNormalized);
-
-		SpreadModifiers.AllModifiersChangeOnTick(DeltaTime);
-		RecoilModifiers.AllModifiersChangeOnTick(DeltaTime);
-
-		// Recoil fade
-		CompensateRecoil(DeltaTime);
-
-		// Set Current Spread Value for Shot Placement and Crosshair HUD dynamic effect
-		CurrentSpreadAngle = SpreadBaseAngle * SpreadModifiers.GetTotalModifier();
-
-		// DBG Spread
-		if (DebugWeaponDrawing_Spread && GEngine)
-			GEngine->AddOnScreenDebugMessage(-1, DeltaTime * 10, FColor::Cyan, *FString::Printf(
-				TEXT("[Spread] Vel %f Pos %f Rate %f Aim %f, Total %f, SpreadAngle %f"),
-				SpreadModifiers.CurrentVelocityModifier, SpreadModifiers.CurrentPosModifier,
-				SpreadModifiers.CurrentFireRateModifier, SpreadModifiers.CurrentAimingModifier,
-				SpreadModifiers.CurrentTotalModifier, CurrentSpreadAngle));
-		//
-	}
-
-}
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-void ASWeapon::ServerWeaponLogicTick_Implementation()
-{
-	WeaponLogicTick();
-}
+// RECOIL BLOCK  //////////////////////////////////////////////////////////////////////////////////////////////////////
 
-
-// RECOIL BLOCK
 void ASWeapon::AddRecoil()
 {
 	if (!OwnerPlayerController) // if character is not player return
@@ -270,8 +224,11 @@ void ASWeapon::CompensateRecoil(float DeltaSec)
 
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// SPREAD BLOCK
+
+// SPREAD BLOCK  //////////////////////////////////////////////////////////////////////////////////////////////////////
+
 FRotator ASWeapon::CalcSpread()
 {
 
@@ -287,8 +244,75 @@ FRotator ASWeapon::CalcSpread()
 
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// FIRE BLOCK
+
+
+// FIRE BLOCK  ////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void ASWeapon::WeaponLogicTick()
+{
+
+	if (!CharOwner)  // server check (same as client has)
+		return;
+
+	// UE_LOG(LogTemp, Warning, TEXT("WEAPON LOGIC TICK"));
+
+	float DeltaTime = GetWorld()->GetDeltaSeconds();
+
+	TimeSinceLastShot += WEAPON_TICK;
+
+	float VelocityModifierNormalized = CharOwner->GetVelocity().Size() / CharOwner->BaseSpeed;
+	CharacterAimPose Pos = CharStateToAimPose(CharOwner->GetState());
+
+	SpreadModifiers.SetPosModifier(Pos);
+	RecoilModifiers.SetPosModifier(Pos);
+
+	SpreadModifiers.SetVelModifier(VelocityModifierNormalized);
+	RecoilModifiers.SetVelModifier(VelocityModifierNormalized);
+
+	SpreadModifiers.AllModifiersChangeOnTick(DeltaTime);
+	RecoilModifiers.AllModifiersChangeOnTick(DeltaTime);
+
+	// Recoil fade
+	CompensateRecoil(DeltaTime);
+
+	// Set Current Spread Value for Shot Placement and Crosshair HUD dynamic effect
+	CurrentSpreadAngle = SpreadBaseAngle * SpreadModifiers.GetTotalModifier();
+
+	// DBG Spread
+	if (DebugWeaponDrawing_Spread && GEngine)
+		GEngine->AddOnScreenDebugMessage(-1, DeltaTime * 10, FColor::Cyan, *FString::Printf(
+			TEXT("[Spread] Vel %f Pos %f Rate %f Aim %f, Total %f, SpreadAngle %f"),
+			SpreadModifiers.CurrentVelocityModifier, SpreadModifiers.CurrentPosModifier,
+			SpreadModifiers.CurrentFireRateModifier, SpreadModifiers.CurrentAimingModifier,
+			SpreadModifiers.CurrentTotalModifier, CurrentSpreadAngle));
+
+}  // tick logic
+
+
+void ASWeapon::EnableWeaponLogicTick(bool Enable)
+{
+
+	if (Enable) 
+	{
+		if (!CharOwner) {
+			UE_LOG(LogTemp, Warning, TEXT("Can't Enable Weapon Tick When weapon hasn't attached to character"));
+			return;
+		}
+
+		GetWorldTimerManager().ClearTimer(TimerHandle_WeaponTick);
+		GetWorldTimerManager().SetTimer(TimerHandle_WeaponTick, this, &ASWeapon::WeaponLogicTick, WEAPON_TICK, true);
+
+	}
+	else
+	{
+		GetWorldTimerManager().ClearTimer(TimerHandle_WeaponTick);
+	}
+
+}  // weapon logic tick activation, better use on server when attached to character
+
+
 void ASWeapon::SemiAutoFireTimerBind(bool ShotDelayed)
 {
 
@@ -297,7 +321,7 @@ void ASWeapon::SemiAutoFireTimerBind(bool ShotDelayed)
 	Fire();
 	bShouldFire = false;
 
-}
+}  // semi-auto shot delayed queue
 
 
 void ASWeapon::FireLogic()
@@ -357,37 +381,8 @@ void ASWeapon::FireLogic()
 
 
 	// // DEBUG
-	if (DebugWeaponDrawing_Shot > 0) {
-		/*
-		DrawDebugLine(GetWorld(), EyeLocation, TraceEnd, FColor::White, false, 15.0f, 0, 1.0f);
-		DrawDebugLine(GetWorld(), EyeLocation, ShotEnd, FColor::Red, false, 15.0f, 0, 1.0f);
-
-		FVector ShotNormilized = TraceEnd - EyeLocation;
-		ShotNormilized.Normalize();
-
-		FVector ShotSpreadNormalized = ShotEnd - EyeLocation;
-		ShotSpreadNormalized.Normalize();
-
-		float ActualShotAngle = UKismetMathLibrary::DegAcos(FVector::DotProduct(ShotNormilized, ShotSpreadNormalized));
-
-		FString PrintStr = FString::Printf(
-			TEXT("Rotator: %s, RotatorSum: %f, RotEuqulid: %f, TempAngle: %f, Calc: %f"),
-			*ShotSpreadAngle.ToString(),
-			FMath::Abs(ShotSpreadAngle.Pitch) + FMath::Abs(ShotSpreadAngle.Yaw) + FMath::Abs(ShotSpreadAngle.Roll),
-			sqrtf(FMath::Square(ShotSpreadAngle.Pitch) + FMath::Square(ShotSpreadAngle.Yaw) + FMath::Square(ShotSpreadAngle.Roll)),
-			TempAngle,
-			ActualShotAngle
-		);
-
-		DrawDebugString(GetWorld(), ShotEnd, *PrintStr, (AActor*)0, FColor::White, FireRate);
-		UE_LOG(LogTemp, Warning, TEXT("Rotator: %s, RotatorSum: %f, RotEuqulid: %f, TempAngle: %f, Calc: %f"),
-			*ShotSpreadAngle.ToString(),
-			FMath::Abs(ShotSpreadAngle.Pitch) + FMath::Abs(ShotSpreadAngle.Yaw) + FMath::Abs(ShotSpreadAngle.Roll),
-			sqrtf(FMath::Square(ShotSpreadAngle.Pitch) + FMath::Square(ShotSpreadAngle.Yaw) + FMath::Square(ShotSpreadAngle.Roll)),
-			TempAngle,
-			ActualShotAngle
-		);*/
-
+	if (DebugWeaponDrawing_Shot > 0) 
+	{
 		float DrawSize = 3.0f;
 
 		if (LastHit.Distance >= 10000.0f)
@@ -403,7 +398,7 @@ void ASWeapon::FireLogic()
 
 	}
 
-}
+}  // actual single shot logic (fire line trace)
 
 
 void ASWeapon::PlayFireEffects()
@@ -427,7 +422,8 @@ void ASWeapon::PlayFireEffects()
 	if (bCameraShaking && CameraShakeEffect && OwnerPlayerController) {
 		OwnerPlayerController->ClientPlayCameraShake(CameraShakeEffect, CameraShakeScale);
 	}
-}
+
+}  // fire FX
 
 
 void ASWeapon::PlayImpactEffects()
@@ -458,7 +454,8 @@ void ASWeapon::PlayImpactEffects()
 		UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), SelectedEffect, ImpactPoint, ShotDirection.Rotation());
 
 	}
-}
+
+}  // impact surface FX
 
 
 void ASWeapon::OnRep_HitScanTrace()
@@ -466,23 +463,20 @@ void ASWeapon::OnRep_HitScanTrace()
 	// Play cosmetic FX
 	PlayFireEffects();
 	PlayImpactEffects();
-}
+
+}  // replication shot
 
 
 void ASWeapon::Fire()
 {
 
-	if (GetLocalRole() == ROLE_SimulatedProxy)
-	{
+	ServerFire();
 
-	}
+}  // character (player) on fire button logic handler
 
-	if (GetLocalRole() == ROLE_AutonomousProxy)
-	{
-		ServerFire();
-		return;
-	}
 
+void ASWeapon::ServerFire_Implementation()
+{
 	if (bShotIsDelayed || bIsReloading || AmmoCurrent == 0)
 	{
 		return;
@@ -496,7 +490,6 @@ void ASWeapon::Fire()
 	if (TimeSinceLastShot < FireRate) {
 
 		if (bShotCanBeDelayed && !bShotIsDelayed) {
-
 			bShotIsDelayed = true;
 
 			GetWorldTimerManager().ClearTimer(TimerHandle_FireCoolDown);
@@ -529,29 +522,22 @@ void ASWeapon::Fire()
 	ShotCount++;
 	AmmoCurrent--;
 
-	TimeSinceLastShot = 0.0f;
+	TimeSinceLastShot = WEAPON_TICK;
 	bShotIsDelayed = false;
 
-}
-
-
-void ASWeapon::ServerFire_Implementation()
-{
-	Fire();
-	//FireLogic();
-	//PlayFireEffects();
-	//PlayImpactEffects();
-
-}
+} // server character (player) on fire button logic handler
 
 
 bool ASWeapon::ServerFire_Validate()
 {
 	return true;
-}
+
+} 
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-// RELOADING BLOCK
+// RELOADING BLOCK  ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 void ASWeapon::PlayReloadAnim()  
 {
@@ -664,20 +650,33 @@ void ASWeapon::OnRep_Reloading()
 	}
 }  // replication reload
 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// NETWORKING REPLICATION
+
+// NETWORKING REPLICATION  ////////////////////////////////////////////////////////////////////////////////////////////
+
 void ASWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(ASWeapon, CharOwner);
 	DOREPLIFETIME_CONDITION(ASWeapon, bIsReloading, COND_SkipOwner);
-	DOREPLIFETIME(ASWeapon, AmmoCurrent);
-	DOREPLIFETIME(ASWeapon, AmmoMax);
-	DOREPLIFETIME(ASWeapon, TimerHandle_FireCoolDown);
+	DOREPLIFETIME(ASWeapon, AmmoCurrent);  // temp for cosmetic
+	DOREPLIFETIME(ASWeapon, AmmoMax);  // temp for cosmetic
+	// DOREPLIFETIME(ASWeapon, TimerHandle_FireCoolDown);
 
 	// DOREPLIFETIME_CONDITION(ASWeapon, HitScanTrace, COND_SkipOwner);
 	DOREPLIFETIME(ASWeapon, HitScanTrace);
 	// DOREPLIFETIME_CONDITION_NOTIFY(ASWeapon, HitScanTrace, COND_Custom, REPNOTIFY_Always);
 
+	// weapon tick (and not only that)
+	//DOREPLIFETIME_CONDITION(ASWeapon, SpreadModifiers, COND_AutonomousOnly);
+	//DOREPLIFETIME_CONDITION(ASWeapon, RecoilModifiers, COND_AutonomousOnly);
+	// DOREPLIFETIME_CONDITION(ASWeapon, RecoilParams, COND_AutonomousOnly);
+	DOREPLIFETIME_CONDITION(ASWeapon, CurrentSpreadAngle, COND_AutonomousOnly);
+
+	//DOREPLIFETIME_CONDITION(ASWeapon, TimeSinceLastShot, COND_AutonomousOnly);
+
 }
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

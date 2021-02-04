@@ -171,10 +171,7 @@ void ASCharacter::BeginZoom()
 
 	if (Weapon)
 	{
-		Weapon->SpreadModifiers.SetAimingModifier(true);
-		Weapon->RecoilModifiers.SetAimingModifier(true);
-		//Weapon->SpreadModifiers.DropFireRateModifier();
-		//Weapon->RecoilModifiers.DropFireRateModifier();
+		Weapon->SetShouldAim(true);
 	}
 }
 
@@ -185,10 +182,7 @@ void ASCharacter::EndZoom()
 
 	if (Weapon)
 	{
-		Weapon->SpreadModifiers.SetAimingModifier(false);
-		Weapon->RecoilModifiers.SetAimingModifier(false);
-		//Weapon->SpreadModifiers.DropFireRateModifier();
-		//Weapon->RecoilModifiers.DropFireRateModifier();
+		Weapon->SetShouldAim(false);
 	}
 }
 
@@ -200,7 +194,7 @@ void ASCharacter::Fire()
 
 	if (Weapon && !bShouldSprinting) {
 
-		Weapon->bShouldFire = true;
+		Weapon->SetShouldFire(true);
 		Weapon->Fire();
 	}
 
@@ -214,7 +208,7 @@ void ASCharacter::StopFire()
 
 	if (Weapon) {
 
-		Weapon->bShouldFire = false;
+		Weapon->SetShouldFire(false);
 
 	}
 
@@ -322,9 +316,9 @@ void ASCharacter::EndCrouch()
 
 void ASCharacter::SpawnWeapon(TSubclassOf<ASWeapon> WeaponClass)
 {
-	if (GEngine)
+	/*if (GEngine)
 		GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Cyan, *FString::Printf(
-			TEXT("SpawnWeapon")));
+			TEXT("SpawnWeapon")));*/
 
 	ServerSpawnWeapon(WeaponClass);
 
@@ -333,9 +327,9 @@ void ASCharacter::SpawnWeapon(TSubclassOf<ASWeapon> WeaponClass)
 
 void ASCharacter::ServerSpawnWeapon_Implementation(TSubclassOf<ASWeapon> WeaponClass)
 {
-	if (GEngine)
+	/*if (GEngine)
 		GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Cyan, *FString::Printf(
-			TEXT("ServerSpawnWeapon_Implementation")));
+			TEXT("ServerSpawnWeapon_Implementation")));*/
 
 	ASWeapon* SpawnedWeapon = GetWorld()->SpawnActor<ASWeapon>(WeaponClass, GetActorLocation(), GetActorRotation());
 	SpawnedWeapon->AttachToASCharacter(this);
@@ -354,9 +348,9 @@ void ASCharacter::SetState(ECharacterState NewCharacterState)
 
 	StateTime = 0.0f;
 
-	if (GEngine)
+	/*if (GEngine)
 		GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Cyan, *FString::Printf(
-			TEXT("SetState id: %d, %s"), GetPlayerState()->GetPlayerId(), *DebugCharState(NewCharacterState)));
+			TEXT("SetState id: %d, %s"), GetPlayerState()->GetPlayerId(), *DebugCharState(NewCharacterState)));*/
 	
 }
 
