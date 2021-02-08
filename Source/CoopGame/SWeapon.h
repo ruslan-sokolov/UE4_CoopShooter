@@ -414,7 +414,7 @@ public:
 		float CurrentSpreadAngle;
 
 	/**  Recoil Parameters */
-	UPROPERTY(Replicated, EditDefaultsOnly, BlueprintReadWrite, Category = "Weapon: Aim")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Weapon: Aim")
 		FRecoilInput RecoilParams;
 
 	/**  Base Weapon Damage */
@@ -489,20 +489,16 @@ protected:
 	 /* RECOIL Compensate Recoil */
 	 void CompensateRecoil(float DeltaSec);
 
-	 /** CAMERA SHAKE player controller ref */
-	 APlayerController* OwnerPlayerController;
-
-	 /* SPREAD Character ref to get velocity for spread cal etc */
-	 UPROPERTY(Replicated)
-		ASCharacter* CharOwner;
+	 /** TODO: REMOVE CAMERA SHAKE player controller ref */
+	// APlayerController* OwnerPlayerController;
 
 public:
 	/** Player Pose Recoil Multiplier */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon: Aim")
+	UPROPERTY(Replicated, EditAnywhere, BlueprintReadWrite, Category = "Weapon: Aim")
 		FCharacterShootModifiers SpreadModifiers;
 
 	/** Player Pose Spread Multiplier */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon: Aim")
+	UPROPERTY(Replicated, EditAnywhere, BlueprintReadWrite, Category = "Weapon: Aim")
 		FCharacterShootModifiers RecoilModifiers;
 
 	/** Current Crosshair To Override */
@@ -510,11 +506,18 @@ public:
 		TSubclassOf<class USCrosshairWidget> CrosshairOverride;
 
 	/** Attach Weapon To Character */
-	UFUNCTION(BlueprintCallable, Category = "Weapon: Use")
-		void AttachToASCharacter(ASCharacter* Character);
-
-	UFUNCTION(Server, Reliable)
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Weapon: Use")
 		void ServerAttachToASCharacter(ASCharacter* Character);
+
+	UFUNCTION(Client, Reliable)
+		void ClientAttachToASCharacter();
+	
+	UFUNCTION()
+		void OnRep_CharOwner();
+
+	/* SPREAD Character ref to get velocity for spread cal etc */
+	UPROPERTY(ReplicatedUsing = OnRep_CharOwner)
+		ASCharacter* CharOwner;
 
 	virtual void BeginDestroy() override;
 
@@ -575,9 +578,16 @@ protected:
 	bool bShouldFire;
 
 
-	void WeaponLogicTick();
+	void WeaponLogicTickClient();
+	void WeaponLogicTickServer();
+	
 	void EnableWeaponLogicTick(bool Enable);
-	FTimerHandle TimerHandle_WeaponTick;
+	
+	UFUNCTION(Reliable, Server)
+		void ServerEnableWeaponLogicTick(bool Enable);
+	
+	FTimerHandle TimerHandle_WeaponTickClient;
+	FTimerHandle TimerHandle_WeaponTickServer;
 
 
 	UFUNCTION()
@@ -596,7 +606,8 @@ protected:
 	/** Semiauto mode smooth fire rate. */
 	bool bShotIsDelayed;
 
-	float TimeSinceLastShot;
+	UPROPERTY(Replicated)
+		float TimeSinceLastShot;
 
 	FTimerHandle TimerHandle_FireCoolDown;
 
@@ -621,6 +632,7 @@ public:
 
 	void PlayFireEffects();
 	void PlayImpactEffects();
+	void PlayCameraShakeEffect();
 
 
 	uint32 ShotCount;

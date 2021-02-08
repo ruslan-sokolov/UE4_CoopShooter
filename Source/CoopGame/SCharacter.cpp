@@ -47,6 +47,7 @@ void ASCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// movements defaults todo: resolve server client only actions
 	BaseSpeed = GetCharacterMovement()->MaxWalkSpeed;
 
 	GetCharacterMovement()->MaxWalkSpeed = BaseSpeed;
@@ -54,14 +55,14 @@ void ASCharacter::BeginPlay()
 	bUseControllerRotationYaw = true;
 
 	DefaultFOV = CameraComp->FieldOfView;
+	//
 
+	// spawn weapon from server
 	if (GetLocalRole() == ROLE_Authority)
 	{
 		if (WeaponClassToSpawnWith)
 			SpawnWeapon(WeaponClassToSpawnWith);
 	}
-
-
 }
 
 // Called every frame
@@ -112,7 +113,7 @@ void ASCharacter::Tick(float DeltaTime)
 	}
 	//
 
-	// DEBUG STATE
+	// DEBUG STATE TODO: debug param on screen
 	DrawDebugString(GetWorld(), GetMesh()->GetBoneLocation(FName(TEXT("head"))) + FVector(0.0f, 30.0f, 30.0f), *FString::Printf(TEXT("%s"), *DebugCharState(CharacterState)), (AActor*)0, FColor::White, DeltaTime);
 	DrawDebugString(GetWorld(), GetMesh()->GetBoneLocation(FName(TEXT("head"))) + FVector(0.0f, -30.0f, 30.0f), *FString::Printf(TEXT("%d"), (int32)GetVelocity().Size()), (AActor*)0, FColor::White, DeltaTime);
 	//
@@ -316,23 +317,13 @@ void ASCharacter::EndCrouch()
 
 void ASCharacter::SpawnWeapon(TSubclassOf<ASWeapon> WeaponClass)
 {
-	/*if (GEngine)
-		GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Cyan, *FString::Printf(
-			TEXT("SpawnWeapon")));*/
-
 	ServerSpawnWeapon(WeaponClass);
-
 }
-
 
 void ASCharacter::ServerSpawnWeapon_Implementation(TSubclassOf<ASWeapon> WeaponClass)
 {
-	/*if (GEngine)
-		GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Cyan, *FString::Printf(
-			TEXT("ServerSpawnWeapon_Implementation")));*/
-
 	ASWeapon* SpawnedWeapon = GetWorld()->SpawnActor<ASWeapon>(WeaponClass, GetActorLocation(), GetActorRotation());
-	SpawnedWeapon->AttachToASCharacter(this);
+	SpawnedWeapon->ServerAttachToASCharacter(this);
 }
 
 
@@ -412,4 +403,5 @@ void ASCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 
 	DOREPLIFETIME(ASCharacter, Weapon);
 	DOREPLIFETIME_CONDITION(ASCharacter, CharacterState, COND_SimulatedOnly);
+	DOREPLIFETIME_CONDITION(ASCharacter, CarriedWeaponSpeedModifier, COND_AutonomousOnly);
 }

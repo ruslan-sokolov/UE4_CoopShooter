@@ -196,7 +196,7 @@ public:
 		void ServerSpawnWeapon(TSubclassOf<ASWeapon> WeaponClass);
 
 	/** Carried Weapon Speed modifier **/
-	UPROPERTY(BlueprintReadOnly, Category = "Chracter: Combat")
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Chracter: Combat")
 		float CarriedWeaponSpeedModifier = 1.0f;
 
 	/** Weapon Attachment SocketName **/
