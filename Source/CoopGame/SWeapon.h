@@ -375,6 +375,10 @@ struct FHitScanTrace
 	UPROPERTY()
 		FVector_NetQuantize ImpactPoint;
 
+	/** if true, then line trace was blocked, if false - not. (shot in the sky will be false) */
+	UPROPERTY()
+		bool bHitSuccess;
+
 	UPROPERTY()
 		TEnumAsByte<EPhysicalSurface> HitSurfaceType;
 
@@ -466,6 +470,10 @@ protected:
 	/** Particle effect on weapon hit surface and it's flesh */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon: WeaponFX")
 		UParticleSystem* ImpactEffectFlesh;
+
+	/** If true, shot impact effect will be played even when shot trace was not blocked */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon: WeaponFX", meta = (EditCondition = "ImpactEffectDefault"))
+		bool bImpactEffectIgnoreShotTraceBlocked;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon: WeaponFX")
 		UParticleSystem* TraceEffect;

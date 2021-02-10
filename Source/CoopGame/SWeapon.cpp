@@ -432,24 +432,31 @@ void ASWeapon::FireLogic()
 		// Blocking hit! Process damage
 		AActor* HitActor = LastHit.GetActor();
 
+		// surface determination
 		EPhysicalSurface SurfaceType = UPhysicalMaterial::DetermineSurfaceType(LastHit.PhysMaterial.Get());
 
-		float CurrentDamage = this->Damage;
-
-		if (SurfaceType == SURFACE_FLESHVULNERABLE) {
-
+		// apply damage handle
+		float CurrentDamage = Damage;
+		if (SurfaceType == SURFACE_FLESHVULNERABLE)
 			CurrentDamage *= HeadshotDamageMultiplier;
-		}
 
 		UGameplayStatics::ApplyPointDamage(HitActor, CurrentDamage, ShotDirection, LastHit, MyOwner->GetInstigatorController(), this, DamageType);
-	
-		// NET REPLICATION FOR SHOT EFFECT
-		if (GetLocalRole() == ROLE_Authority)
-		{
-			HitScanTrace.ImpactPoint = LastHit.ImpactPoint.Size() > 0.0f ? LastHit.ImpactPoint : LastHit.TraceEnd;
-			HitScanTrace.HitSurfaceType = SurfaceType;
-		}
-	} // Line Trace
+		//
+
+		// Replication shot fx
+		HitScanTrace.ImpactPoint = LastHit.ImpactPoint;
+		HitScanTrace.HitSurfaceType = SurfaceType;
+		HitScanTrace.bHitSuccess = true;
+		//
+	}
+	else
+	{
+		// Hit not blocked!
+		// Replication shot fx
+		HitScanTrace.ImpactPoint = ShotEnd;
+		HitScanTrace.HitSurfaceType = SurfaceType_Default;
+		HitScanTrace.bHitSuccess = false;
+	}  // line trace
 
 	// Shooting Modifiers On Shoot Modifier Resolve
 	SpreadModifiers.SetFireRateModifier(TimeSinceLastShot);
@@ -497,10 +504,9 @@ void ASWeapon::PlayFireEffects()
 
 void ASWeapon::PlayImpactEffects()
 {
-	EPhysicalSurface SurfaceType = SurfaceType_Default;
 	UParticleSystem* SelectedEffect;
 
-	switch (SurfaceType) 
+	switch (HitScanTrace.HitSurfaceType)
 	{
 	case SURFACE_FLESHDEFAULT:
 		SelectedEffect = ImpactEffectFlesh;
@@ -513,15 +519,18 @@ void ASWeapon::PlayImpactEffects()
 		break;
 	}
 
-	if (SelectedEffect) 
+	if (HitScanTrace.bHitSuccess || bImpactEffectIgnoreShotTraceBlocked)
 	{
-		FVector ImpactPoint = HitScanTrace.ImpactPoint;
-		FVector MuzzleLoc = MeshComp->GetSocketLocation(MuzzleSocketName);
+		if (SelectedEffect)
+		{
+			FVector ImpactPoint = HitScanTrace.ImpactPoint;
+			FVector MuzzleLoc = MeshComp->GetSocketLocation(MuzzleSocketName);
 
-		FVector ShotDirection = ImpactPoint - MuzzleLoc;
-		ShotDirection.Normalize();
+			FVector ShotDirection = ImpactPoint - MuzzleLoc;
+			ShotDirection.Normalize();
 
-		UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), SelectedEffect, ImpactPoint, ShotDirection.Rotation());
+			UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), SelectedEffect, ImpactPoint, ShotDirection.Rotation());
+		}
 	}
 }  // impact surface FX
 
