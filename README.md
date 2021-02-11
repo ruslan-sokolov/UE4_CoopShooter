@@ -1,1 +1,1 @@
-# This is learning project from Udemy Tom Looman
+My coop shooter game (all started with simple Udemy Tom Looman learning project)
