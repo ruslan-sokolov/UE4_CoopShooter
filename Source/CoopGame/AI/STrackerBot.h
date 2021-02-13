@@ -6,6 +6,9 @@
 #include "GameFramework/Pawn.h"
 #include "STrackerBot.generated.h"
 
+class USHealthComponent;
+class URadialForceComponent;
+
 UCLASS()
 class COOPGAME_API ASTrackerBot : public APawn
 {
@@ -22,6 +25,12 @@ protected:
 	UPROPERTY(VisibleDefaultsOnly, Category = "Components")
 		UStaticMeshComponent* MeshComp;
 	
+	UPROPERTY(VisibleDefaultsOnly, Category = "Components")
+		USHealthComponent* HealthComp;
+
+	UPROPERTY(VisibleDefaultsOnly, Category = "Components")
+		URadialForceComponent* RadialForceComp;
+
 	// [Tracker bot Move resolving logic] ////////////////////////////////////////////////////////////////////////////////
 
 	FVector GetNextPathPoint();
@@ -30,18 +39,18 @@ protected:
 	FVector NextPathPoint;
 
 	/** Force Applied To Mesh Comp Every MoveTick */
-	UPROPERTY(EditDefaultsOnly, Category = "Tracker Bot")
+	UPROPERTY(EditDefaultsOnly, Category = "Tracker Bot: Move")
 		float MovementForce;
 	
-	UPROPERTY(EditDefaultsOnly, Category = "Tracker Bot")
+	UPROPERTY(EditDefaultsOnly, Category = "Tracker Bot: Move")
 		bool bUseVelocityChange;
 	
 	/** Allowed Distance Inaccuracy to consider NextPathPoint reached */
-	UPROPERTY(EditDefaultsOnly, Category = "Tracker Bot")
+	UPROPERTY(EditDefaultsOnly, Category = "Tracker Bot: Move")
 		float RequiredDistanceToTarget;
 
 	/** Delay when MoveToNextPathPoint will be called */
-	UPROPERTY(EditDefaultsOnly, Category = "Tracker Bot")
+	UPROPERTY(EditDefaultsOnly, Category = "Tracker Bot: Move")
 		float MoveControlTick;
 
 	FTimerHandle TimerHandle_MoveControl;
@@ -55,23 +64,23 @@ protected:
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	// [Tracker bot Stuck resolving logic] ///////////////////////////////////////////////////////////////////////////////
-
+	
 	/** When TracketBot stuck somewhere it will be launched to NextPathPoint with LaunchOnStuckImpulse*/
-	UPROPERTY(EditDefaultsOnly, Category = "Tracket Bot")
+	UPROPERTY(EditDefaultsOnly, Category = "Tracker Bot: Launch")
 		bool bUseLaunchWhenStuck;
 
 	/** X vector val here is towards direction launch impulse to NextPathPoint */
-	UPROPERTY(EditDefaultsOnly, Category = "Tracket Bot", meta = (EditCondition = "bUseLaunchWhenStuck"))
+	UPROPERTY(EditDefaultsOnly, Category = "Tracker Bot: Launch", meta = (EditCondition = "bUseLaunchWhenStuck"))
 		FVector LaunchOnStuckImpulse;
 
 	/** When TrackerBot stays in StuckDistanceDelta range that amount of time - it will recieve LaunchOnStuckImpulse*/
-	UPROPERTY(EditDefaultsOnly, Category = "Tracker Bot", meta = (EditCondition = "bUseLaunchWhenStuck"))
+	UPROPERTY(EditDefaultsOnly, Category = "Tracker Bot: Launch", meta = (EditCondition = "bUseLaunchWhenStuck"))
 		float TimeToConsiderStuck;
 
 	float TimeToConsiderStuckAccomulation;
 
 	/** If TrackerBot stayes in this range for TimeToConsiderStuck - it will be recieve LaunchOnStuckImpulse*/
-	UPROPERTY(EditDefaultsOnly, Category = "Tracker Bot", meta = (EditCondition = "bUseLaunchWhenStuck"))
+	UPROPERTY(EditDefaultsOnly, Category = "Tracker Bot: Launch", meta = (EditCondition = "bUseLaunchWhenStuck"))
 		float StuckDistanceDelta;
 
 	/* Last MoveTick Actor Location (used for initialization tracker bot possible stuck location) */
@@ -89,6 +98,35 @@ protected:
 	void LaunchOnStuck();
 
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	UFUNCTION()
+		void OnHealthChange_HandleTakeDamage(USHealthComponent* OwningHealthComp, float Health, float HealthDelta,
+			const class UDamageType* InstigatedDamageType, class AController* InstigatedBy, AActor* DamageCauser);
+
+	// Dynamic material to pulse on damage
+	UMaterialInstanceDynamic* MatInst;
+
+	void SelfDestruct();
+
+	UPROPERTY(EditDefaultsOnly, Category = "Tracker Bot: Explosion")
+		UParticleSystem* ExplosionEffect;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Tracker Bot: Explosion")
+		float ExplosionDamage;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Tracker Bot: Explosion")
+		float ExplosionRadius;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Tracker Bot: Explosion")
+		bool bDoFullDamage;
+
+	UPROPERTY(VisibleDefaultsOnly, Category = "Tracker Bot: Explosion")
+		TSubclassOf<UDamageType> DamageType;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Tracker Bot: Explosion")
+		bool bExplosionApplyRadialImpulse;
+
+	bool bExploded;
 
 public:	
 	// Called every frame
