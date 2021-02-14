@@ -8,6 +8,9 @@
 
 class USHealthComponent;
 class URadialForceComponent;
+class UAudioComponent;
+
+int32 debugParam = 0;
 
 UCLASS()
 class COOPGAME_API ASTrackerBot : public APawn
@@ -32,6 +35,8 @@ protected:
 		URadialForceComponent* RadialForceComp;
 
 	// [Tracker bot Move resolving logic] ////////////////////////////////////////////////////////////////////////////////
+
+	ACharacter* ChasedCharacter;
 
 	FVector GetNextPathPoint();
 	
@@ -99,6 +104,8 @@ protected:
 
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+	// [Tracker bot explosion logic] /////////////////////////////////////////////////////////////////////////////////////
+
 	UFUNCTION()
 		void OnHealthChange_HandleTakeDamage(USHealthComponent* OwningHealthComp, float Health, float HealthDelta,
 			const class UDamageType* InstigatedDamageType, class AController* InstigatedBy, AActor* DamageCauser);
@@ -127,6 +134,60 @@ protected:
 		bool bExplosionApplyRadialImpulse;
 
 	bool bExploded;
+
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	// [Tracker bot sound effects] ///////////////////////////////////////////////////////////////////////////////////////
+
+	UPROPERTY(EditDefaultsOnly, Category = "Components")
+		UAudioComponent* BounceSound;
+
+	/** When on MeshComp simulation hit impulse is lower then this value, sound will not be played */
+	UPROPERTY(EditDefaultsOnly, Category = "Tracker Bot: Sound")
+		float BounceSound_HitImpulseTrashhold;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Tracker Bot: Explosion")
+		USoundBase* ExplosionSound;
+
+	UFUNCTION()
+		void OnMeshCompHit(UPrimitiveComponent* HitComponent, AActor* OtherActor, 
+			UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);
+
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	// [Tracker bot near character jump and explode] /////////////////////////////////////////////////////////////////////
+
+	/** If in  DistanceToJumpAndExplode, TrackerBot will jump to character and explode*/
+	UPROPERTY(EditDefaultsOnly, Category = "Tracker Bot: Explosion")
+		bool bJumpAndExplodeNearChasedCharacter;
+
+	/** If Distance from TrackerBot to ChasedCharacter is lower than this val, Tracker bot will jump and explode */
+	UPROPERTY(EditDefaultsOnly, Category = "Tracker Bot: Explosion", meta = (EditCondition = "bJumpAndExplodeNearChasedCharacter"))
+		float DistanceToJumpAndExplode;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "Tracker Bot: Explosion", meta = (EditCondition = "bJumpAndExplodeNearChasedCharacter"))
+		FName ChasedCharacterBoneJumpTo;
+
+	void CheckExplodeActivation_OnTimer_MoveControl();
+
+	void RunDelayedDetonation();
+
+	bool bDelayedDetonationActivated;
+
+	/** Extra Delay before explosion after jump max height Z reached */
+	UPROPERTY(EditDefaultsOnly, Category = "Tracker Bot: Explosion", meta = (EditCondition = "bJumpAndExplodeNearChasedCharacter"))
+		float JumpHeightReachExplosionDelay;
+
+	/** Extra Z Height added to ChasedCharacterBoneLocation to Jump Before Detonation */
+	UPROPERTY(EditDefaultsOnly, Category = "Tracker Bot: Explosion", meta = (EditCondition = "bJumpAndExplodeNearChasedCharacter"))
+		float JumpExtraHeight;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Tracker Bot: Explosion", meta = (EditCondition = "bJumpAndExplodeNearChasedCharacter"))
+		bool bAddAngularImpulseOnJumpExplosion;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "Tracker Bot: Explosion", meta = (EditCondition = "bAddAngularImpulseOnJumpExplosion"))
+		FVector AngularVelocityOnJumpExplosion;
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 public:	
 	// Called every frame
