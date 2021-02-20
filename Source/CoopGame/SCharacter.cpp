@@ -26,9 +26,10 @@ ASCharacter::ASCharacter()
 	PrimaryActorTick.bCanEverTick = true;
 
 	GetMesh()->SetGenerateOverlapEvents(true);  // static mesh with charactermesh collision will response to COLLISION_TRACER
-	
-	GetCapsuleComponent()->SetCollisionResponseToChannel(COLLISION_WEAPON, ECR_Ignore);
-	GetCapsuleComponent()->SetCollisionResponseToChannel(COLLISION_TRACER, ECR_Ignore);
+
+	UCapsuleComponent* CapsuleComp = GetCapsuleComponent();
+	CapsuleComp->SetCollisionResponseToChannel(COLLISION_WEAPON, ECR_Ignore);
+	CapsuleComp->SetCollisionResponseToChannel(COLLISION_TRACER, ECR_Ignore);
 
 	SpringArmComp = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArmComp"));
 	SpringArmComp->bUsePawnControlRotation = true;
@@ -42,7 +43,6 @@ ASCharacter::ASCharacter()
 	HealthComp = CreateDefaultSubobject<USHealthComponent>(TEXT("HealthComp"));
 
 	HealthComp->OnHealthChanged.AddDynamic(this, &ASCharacter::OnHealthChanged);
-
 }
 
 // Called when the game starts or when spawned

@@ -60,8 +60,7 @@ ASWeapon::ASWeapon()
 	PrimaryActorTick.bCanEverTick = true;
 
 	MeshComp = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("MeshComp"));
-	MeshComp->SetCollisionProfileName(UCollisionProfile::BlockAllDynamic_ProfileName);
-	MeshComp->SetGenerateOverlapEvents(true);
+	MeshComp->SetCollisionProfileName(UCollisionProfile::NoCollision_ProfileName);
 	RootComponent = MeshComp;
 	
 	// Semi auto shot delay lambda
