@@ -448,15 +448,20 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Owner: Speed")
 		float CharacterSpeedModifier = 0.95f;
 
+	FORCEINLINE USkeletalMeshComponent* GetMeshComp() { return MeshComp; }
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon: WeaponFX")
+		FName MuzzleSocketName = "Muzzle";
+
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon: WeaponFX")
+		TSubclassOf<ASWeaponTracerSimulated> TracerSimulatedClass;
+
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
 		USkeletalMeshComponent* MeshComp;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon: Fire")
 		TSubclassOf<UDamageType> DamageType;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon: WeaponFX")
-		FName MuzzleSocketName = "Muzzle";
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon: WeaponFX")
 		FName TargetTraceEffect = "Target";
@@ -500,9 +505,6 @@ protected:
 
 	/** TODO: REMOVE CAMERA SHAKE player controller ref */
 	// APlayerController* OwnerPlayerController;
-	
-	UPROPERTY(EditDefaultsOnly, Category = "Weapon: WeaponFX")
-		TSubclassOf<ASWeaponTracerSimulated> TracerSimulatedClass;
 
 public:
 	/** Player Pose Recoil Multiplier */

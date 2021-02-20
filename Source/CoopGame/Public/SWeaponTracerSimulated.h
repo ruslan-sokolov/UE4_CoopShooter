@@ -6,6 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "SWeaponTracerSimulated.generated.h"
 
+class ASWeapon;
 class UProjectileMovementComponent;
 class USphereComponent;
 
@@ -17,7 +18,10 @@ class COOPGAME_API ASWeaponTracerSimulated : public AActor
 public:	
 	ASWeaponTracerSimulated();
 
+	static ASWeaponTracerSimulated* SpawnFromWeapon(ASWeapon* Weapon);
+
 protected:
+	virtual void BeginPlay() override;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Components")
 		USphereComponent* SphereComp;
@@ -62,4 +66,6 @@ protected:
 	UFUNCTION()
 		void OnHit(UPrimitiveComponent* HitComponent, AActor* OtherActor,
 			UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);
+
+	ASWeapon* WeaponOwner;
 };

@@ -503,14 +503,7 @@ void ASWeapon::PlayFireEffects()
 
 	if (TracerSimulatedClass)
 	{
-		// @TODO: ShotDirection.Rotation() is duplicated, make as argument
-		FVector ImpactPoint = HitScanTrace.ImpactPoint;
-		FVector MuzzleLoc = MeshComp->GetSocketLocation(MuzzleSocketName);
-
-		FVector ShotDirection = ImpactPoint - MuzzleLoc;
-		ShotDirection.Normalize();
-
-		ASWeaponTracerSimulated* TracerSimulated = GetWorld()->SpawnActor<ASWeaponTracerSimulated>(TracerSimulatedClass, MuzzleLoc, ShotDirection.Rotation());
+		ASWeaponTracerSimulated::SpawnFromWeapon(this);
 	}
 
 	if (FireSound)

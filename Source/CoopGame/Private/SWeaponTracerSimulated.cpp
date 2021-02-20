@@ -9,11 +9,13 @@
 #include "../CoopGame.h"
 
 #include "DrawDebugHelpers.h"
+#include "../SWeapon.h"
 
+#include "Kismet/GameplayStatics.h"
 
 ASWeaponTracerSimulated::ASWeaponTracerSimulated()
 {
-	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bCanEverTick = false;
 	SetCanBeDamaged(false);
 
 	SphereComp = CreateDefaultSubobject<USphereComponent>(TEXT("SphereComp"));
@@ -51,7 +53,62 @@ ASWeaponTracerSimulated::ASWeaponTracerSimulated()
 	bShouldDestroyOnSecondBounce = true;
 	BounceAngleToNormalMin = 75.0f;
 	BounceAngleCos = cosf(FMath::DegreesToRadians(BounceAngleToNormalMin));  // initialize reflect cos angle
-}	
+}
+
+void ASWeaponTracerSimulated::BeginPlay()
+{
+	Super::BeginPlay();
+
+	// Cast WeaponOwner
+	WeaponOwner = Cast<ASWeapon>(GetOwner());
+
+	if (WeaponOwner != nullptr)
+	{
+
+		float SimTime = 1.0f; // 1 sec
+		FVector InitLocation = GetActorLocation();
+		FVector InitVelocity = SphereComp->GetForwardVector() * ProjectileComp->InitialSpeed;
+		float Gravity = ProjectileComp->GetGravityZ();
+		float Radius = SphereComp->GetScaledSphereRadius();
+
+		FPredictProjectilePathParams PredictParams;
+		PredictParams.StartLocation = InitLocation;
+		PredictParams.LaunchVelocity = InitVelocity;
+		PredictParams.bTraceWithCollision = true;
+		PredictParams.ProjectileRadius = Radius;
+		PredictParams.MaxSimTime = SimTime;
+		PredictParams.TraceChannel = COLLISION_TRACER;
+		PredictParams.SimFrequency = 10.0f;
+		PredictParams.OverrideGravityZ = Gravity;
+		PredictParams.DrawDebugType = EDrawDebugTrace::ForDuration;
+		PredictParams.DrawDebugTime = SimTime;
+
+		FPredictProjectilePathResult PredictResult;
+
+		UGameplayStatics::PredictProjectilePath(GetWorld(), PredictParams, PredictResult);
+		
+		// compute velocity:
+		// v = v0 + a*t
+
+		// compute movement delta
+		// Velocity Verlet integration (http://en.wikipedia.org/wiki/Verlet_integration#Velocity_Verlet)
+		// The addition of p0 is done outside this method, we are just computing the delta.
+		// p = p0 + v0*t + 1/2*a*t^2
+
+		// We use ComputeVelocity() here to infer the acceleration, to make it easier to apply custom velocities.
+		// p = p0 + v0*t + 1/2*((v1-v0)/t)*t^2
+		// p = p0 + v0*t + 1/2*((v1-v0))*t
+
+		FVector OneSecVelocity = InitVelocity + FVector(0.0f, 0.0f, Gravity) * SimTime;
+		FVector OneSecLocation = InitLocation + InitVelocity * SimTime + (OneSecVelocity - InitVelocity) * (0.5f * SimTime);
+
+		DrawDebugSphere(GetWorld(), OneSecLocation, Radius * 1.5f, 12, FColor::Red, false, SimTime);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("ASWeaponTracerSimulated::BeginPlay() GetOwner cast to ASWeapon fail, add Owner Weapon as SpawnParameter"));
+	}
+}
 
 void ASWeaponTracerSimulated::OnProjectileBounce(const FHitResult& ImpactResult, const FVector& ImpactVelocity)
 {
@@ -114,4 +171,37 @@ void ASWeaponTracerSimulated::OnHit(UPrimitiveComponent* HitComponent, AActor* O
 			Destroy();
 		}
 	}
+}
+
+ASWeaponTracerSimulated* ASWeaponTracerSimulated::SpawnFromWeapon(ASWeapon* Weapon)
+{
+	check(Weapon);
+	
+	FVector MuzzleLoc = Weapon->GetMeshComp()->GetSocketLocation(Weapon->MuzzleSocketName);
+
+	FVector ShotDirection = Weapon->HitScanTrace.ImpactPoint - MuzzleLoc;
+	ShotDirection.Normalize();
+
+	// Normal Spawn
+	FActorSpawnParameters SpawnParamters;
+	// SpawnParamters.Instigator = Weapon->GetInstigator();
+	SpawnParamters.Owner = Weapon;
+	
+	ASWeaponTracerSimulated* TracerSimulated = Weapon->GetWorld()->SpawnActor<ASWeaponTracerSimulated>(
+		Weapon->TracerSimulatedClass, MuzzleLoc, ShotDirection.Rotation(), SpawnParamters);
+	//
+	
+	// Spawn Deferred
+	/*const FTransform Transform(ShotDirection.Rotation(), MuzzleLoc, FVector::OneVector);
+
+	ASWeaponTracerSimulated* TracerSimulated = Weapon->GetWorld()->SpawnActorDeferred<ASWeaponTracerSimulated>(
+		Weapon->TracerSimulatedClass, Transform);
+
+	// Do on spawn stuff here
+	TracerSimulated->WeaponOwner = Weapon;
+
+	TracerSimulated->FinishSpawning(Transform);*/
+	//
+
+	return TracerSimulated;
 }
