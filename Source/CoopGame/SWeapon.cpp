@@ -27,6 +27,8 @@
 
 #include "GameFramework/PlayerState.h"
 
+#include "SWeaponTracerSimulated.h"
+
 
 FAutoConsoleVariableRef CVARDebugWeaponDrawing_Shot(
 	TEXT("COOP.DebugWeapons.Shot"),
@@ -58,6 +60,8 @@ ASWeapon::ASWeapon()
 	PrimaryActorTick.bCanEverTick = true;
 
 	MeshComp = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("MeshComp"));
+	MeshComp->SetCollisionProfileName(UCollisionProfile::BlockAllDynamic_ProfileName);
+	MeshComp->SetGenerateOverlapEvents(true);
 	RootComponent = MeshComp;
 	
 	// Semi auto shot delay lambda
@@ -484,10 +488,12 @@ void ASWeapon::FireLogic()
 void ASWeapon::PlayFireEffects()
 {
 	if (MuzzleEffect)
+	{
 		UGameplayStatics::SpawnEmitterAttached(MuzzleEffect, MeshComp, MuzzleSocketName);
+	}
 
-	if (TraceEffect) {
-
+	if (TraceEffect) 
+	{
 		FVector MuzzleLoc = MeshComp->GetSocketLocation(MuzzleSocketName);
 
 		UParticleSystemComponent* PSC = UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), TraceEffect, MuzzleLoc);
@@ -496,9 +502,22 @@ void ASWeapon::PlayFireEffects()
 			PSC->SetVectorParameter(TargetTraceEffect, HitScanTrace.ImpactPoint);
 	}
 
-	if (FireSound)
-		UGameplayStatics::PlaySoundAtLocation(GetWorld(), FireSound, MeshComp->GetSocketLocation(MuzzleSocketName));
+	if (TracerSimulatedClass)
+	{
+		// @TODO: ShotDirection.Rotation() is duplicated, make as argument
+		FVector ImpactPoint = HitScanTrace.ImpactPoint;
+		FVector MuzzleLoc = MeshComp->GetSocketLocation(MuzzleSocketName);
 
+		FVector ShotDirection = ImpactPoint - MuzzleLoc;
+		ShotDirection.Normalize();
+
+		ASWeaponTracerSimulated* TracerSimulated = GetWorld()->SpawnActor<ASWeaponTracerSimulated>(TracerSimulatedClass, MuzzleLoc, ShotDirection.Rotation());
+	}
+
+	if (FireSound)
+	{
+		UGameplayStatics::PlaySoundAtLocation(GetWorld(), FireSound, MeshComp->GetSocketLocation(MuzzleSocketName));
+	}
 }  // fire FX
 
 

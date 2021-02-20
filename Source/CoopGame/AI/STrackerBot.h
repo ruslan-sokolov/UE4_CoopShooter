@@ -10,6 +10,7 @@ class USHealthComponent;
 class URadialForceComponent;
 class UAudioComponent;
 
+// @TODO change to console param
 int32 debugParam = 0;
 
 UCLASS()

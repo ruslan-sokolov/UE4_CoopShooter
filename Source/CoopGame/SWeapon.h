@@ -19,6 +19,7 @@ class UUserWidget;
 class UAnimMontage;
 class UAnimInstance;
 class APlayerController;
+class ASWeaponTracerSimulated;
 
 static int32 DebugWeaponDrawing_Shot;
 static int32 DebugWeaponDrawing_Recoil;
@@ -489,16 +490,19 @@ protected:
 		TSubclassOf<UCameraShake> CameraShakeEffect;
 
 	/* SPREAD Calc Random Base Spread Angle For Shot */
-	 FRotator CalcSpread();
+	FRotator CalcSpread();
 
-	 /* RECOIL Add Recoil After Shot */
-	 void AddRecoil();
+	/* RECOIL Add Recoil After Shot */
+	void AddRecoil();
 
-	 /* RECOIL Compensate Recoil */
-	 void CompensateRecoil(float DeltaSec);
+	/* RECOIL Compensate Recoil */
+	void CompensateRecoil(float DeltaSec);
 
-	 /** TODO: REMOVE CAMERA SHAKE player controller ref */
+	/** TODO: REMOVE CAMERA SHAKE player controller ref */
 	// APlayerController* OwnerPlayerController;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon: WeaponFX")
+		TSubclassOf<ASWeaponTracerSimulated> TracerSimulatedClass;
 
 public:
 	/** Player Pose Recoil Multiplier */

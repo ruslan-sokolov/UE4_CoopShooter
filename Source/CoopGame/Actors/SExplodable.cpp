@@ -18,10 +18,11 @@ ASExplodable::ASExplodable()
 {
 
 	MeshComp = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComp"));
-	RootComponent = MeshComp;
-
+	MeshComp->SetCollisionProfileName(UCollisionProfile::PhysicsActor_ProfileName);
 	MeshComp->SetSimulatePhysics(true);
-	MeshComp->BodyInstance.bNotifyRigidBodyCollision = true;
+	MeshComp->SetNotifyRigidBodyCollision(true);
+	MeshComp->SetGenerateOverlapEvents(true);
+	RootComponent = MeshComp;
 
 	HealthComp = CreateDefaultSubobject<USHealthComponent>(TEXT("HealthComp"));
 	HealthComp->DefaultHealth = 100.f;

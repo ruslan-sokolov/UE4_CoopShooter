@@ -13,3 +13,6 @@
 #define ONE_HUNDRED_METERS			10000.0f
 
 #define WEAPON_TICK					1.0f / 60.0f
+
+#define COLLISION_TRACER			ECC_EngineTraceChannel1
+#define TRACER_PROFILE_NAME			FName("Tracer")

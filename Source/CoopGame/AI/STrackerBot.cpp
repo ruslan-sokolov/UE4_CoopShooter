@@ -18,9 +18,12 @@ ASTrackerBot::ASTrackerBot()
 	PrimaryActorTick.bCanEverTick = true;
 
 	MeshComp = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("StaticMesh"));
+	MeshComp->SetCollisionProfileName(UCollisionProfile::Pawn_ProfileName);
 	MeshComp->SetCanEverAffectNavigation(false);
 	MeshComp->SetSimulatePhysics(true);
 	MeshComp->SetNotifyRigidBodyCollision(true);
+	MeshComp->SetGenerateOverlapEvents(true);
+	MeshComp->OnComponentHit.AddDynamic(this, &ASTrackerBot::OnMeshCompHit);
 	RootComponent = MeshComp;
 
 	HealthComp = CreateDefaultSubobject<USHealthComponent>(TEXT("HealthComp"));
@@ -37,8 +40,6 @@ ASTrackerBot::ASTrackerBot()
 	BounceSound = CreateDefaultSubobject<UAudioComponent>(TEXT("BounceSound"));
 	BounceSound->SetupAttachment(RootComponent);
 	BounceSound->bAutoActivate = false;
-
-	MeshComp->OnComponentHit.AddDynamic(this, &ASTrackerBot::OnMeshCompHit);
 
 	// defaults move
 	bUseVelocityChange = true;
