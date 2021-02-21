@@ -64,45 +64,7 @@ void ASWeaponTracerSimulated::BeginPlay()
 
 	if (WeaponOwner != nullptr)
 	{
-
-		float SimTime = 1.0f; // 1 sec
-		FVector InitLocation = GetActorLocation();
-		FVector InitVelocity = SphereComp->GetForwardVector() * ProjectileComp->InitialSpeed;
-		float Gravity = ProjectileComp->GetGravityZ();
-		float Radius = SphereComp->GetScaledSphereRadius();
-
-		FPredictProjectilePathParams PredictParams;
-		PredictParams.StartLocation = InitLocation;
-		PredictParams.LaunchVelocity = InitVelocity;
-		PredictParams.bTraceWithCollision = true;
-		PredictParams.ProjectileRadius = Radius;
-		PredictParams.MaxSimTime = SimTime;
-		PredictParams.TraceChannel = COLLISION_TRACER;
-		PredictParams.SimFrequency = 10.0f;
-		PredictParams.OverrideGravityZ = Gravity;
-		PredictParams.DrawDebugType = EDrawDebugTrace::ForDuration;
-		PredictParams.DrawDebugTime = SimTime;
-
-		FPredictProjectilePathResult PredictResult;
-
-		UGameplayStatics::PredictProjectilePath(GetWorld(), PredictParams, PredictResult);
-		
-		// compute velocity:
-		// v = v0 + a*t
-
-		// compute movement delta
-		// Velocity Verlet integration (http://en.wikipedia.org/wiki/Verlet_integration#Velocity_Verlet)
-		// The addition of p0 is done outside this method, we are just computing the delta.
-		// p = p0 + v0*t + 1/2*a*t^2
-
-		// We use ComputeVelocity() here to infer the acceleration, to make it easier to apply custom velocities.
-		// p = p0 + v0*t + 1/2*((v1-v0)/t)*t^2
-		// p = p0 + v0*t + 1/2*((v1-v0))*t
-
-		FVector OneSecVelocity = InitVelocity + FVector(0.0f, 0.0f, Gravity) * SimTime;
-		FVector OneSecLocation = InitLocation + InitVelocity * SimTime + (OneSecVelocity - InitVelocity) * (0.5f * SimTime);
-
-		DrawDebugSphere(GetWorld(), OneSecLocation, Radius * 1.5f, 12, FColor::Red, false, SimTime);
+		AdjustInitialVelocityToHitTarget();
 	}
 	else
 	{
@@ -204,4 +166,89 @@ ASWeaponTracerSimulated* ASWeaponTracerSimulated::SpawnFromWeapon(ASWeapon* Weap
 	//
 
 	return TracerSimulated;
+}
+
+void ASWeaponTracerSimulated::AdjustInitialVelocityToHitTarget()
+{
+	//check(WeaponOwner);
+	
+	// initial data
+	float SimTime = 3.33f; // 1 sec
+	FVector InitLocation = GetActorLocation();
+	FVector InitVelocity = SphereComp->GetForwardVector() * ProjectileComp->InitialSpeed;
+	float Gravity = ProjectileComp->GetGravityZ();
+	float Radius = SphereComp->GetScaledSphereRadius();
+	//
+
+	// use engine simulation to check if correct formula
+	FPredictProjectilePathParams PredictParams;
+	PredictParams.StartLocation = InitLocation;
+	PredictParams.LaunchVelocity = InitVelocity;
+	PredictParams.bTraceWithCollision = true;
+	PredictParams.ProjectileRadius = Radius;
+	PredictParams.MaxSimTime = SimTime;
+	PredictParams.TraceChannel = COLLISION_TRACER;
+	PredictParams.SimFrequency = 10.0f;
+	PredictParams.OverrideGravityZ = Gravity;
+	PredictParams.DrawDebugType = EDrawDebugTrace::ForDuration;
+	PredictParams.DrawDebugTime = SimTime;
+
+	FPredictProjectilePathResult PredictResult;
+
+	UGameplayStatics::PredictProjectilePath(GetWorld(), PredictParams, PredictResult);
+	//
+
+	// projectile movement formulas:
+	// compute velocity:
+	// v = v0 + a*t
+
+	// compute movement delta
+	// Velocity Verlet integration (http://en.wikipedia.org/wiki/Verlet_integration#Velocity_Verlet)
+	// The addition of p0 is done outside this method, we are just computing the delta.
+	// p = p0 + v0*t + 1/2*a*t^2
+
+	// We use ComputeVelocity() here to infer the acceleration, to make it easier to apply custom velocities.
+	// p = p0 + v0*t + 1/2*((v1-v0)/t)*t^2
+	// p = p0 + v0*t + 1/2*((v1-v0))*t
+
+	// First (Worked just fine)
+	// FVector OneSecVelocity = InitVelocity + FVector(0.0f, 0.0f, Gravity) * SimTime;
+	// FVector OneSecLocation = InitLocation + InitVelocity * SimTime + (OneSecVelocity - InitVelocity) * (0.5f * SimTime);
+
+	// Optimized
+	FVector OneSecLocation = InitLocation + (InitVelocity + FVector(0.0f, 0.0f, Gravity * SimTime * 0.5f)) * SimTime;
+
+	DrawDebugSphere(GetWorld(), OneSecLocation, Radius * 1.5f, 12, FColor::Red, false, SimTime);
+
+	// Quadratic equation in vector form:
+	// 1/2*a*t^2 + v0*t + (p0-p) = 0
+
+	// Kramer method:
+	// {
+	//   0.5*a.x*t^2 + v0.x*t + (p0-p).x = 0,
+	//   0.5*a.y*t^2 + v0.y*t + (p0-p).y = 0,
+	//   0.5*a.z*t^2 + v0.z*t + (p0-p).z = 0
+	// }
+	// a.x == 0 and a.y == 0 (gravity has z only)
+	// v.y, v.z == 0 (velocity move on x only)
+
+	// basically we compute in XY plane, from first and third we have next equation:
+	// 0.5*a.z*t^2 + v0.z*t + (p0-p).z = v0.x*t + (p0-p).x
+	// 0.5*a.z*t^2 + t*(v0.z - v0.x) + (p0-p).z - (p0-p).x = 0 -> We got here quadratic equation is scalar form
+
+	// Discriminant (Need only positive, time can't be negative):
+	// A*x^2 + B*x + C = 0; x = (-B +- sqrt(B^2 - 4*A*C))/2*A;
+	// A = 0.5 * a.z
+	// B = v0.z - v0.x
+	// C = (p0-p).z - (p0-p).x
+
+	// float a = 0.5f * Gravity;
+	float b = InitVelocity.Z - InitVelocity.X;
+
+	FVector delta_p = InitLocation - OneSecLocation;
+	// float c = delta_p.Z - delta_p.X;
+
+	float ComputeTime = -(sqrtf(b * b - 2.0f * Gravity * (delta_p.Z - delta_p.X)) + b) / Gravity;
+
+	DrawDebugString(GetWorld(), OneSecLocation, *FString::Printf(TEXT("Time: %f"), ComputeTime));
 }

@@ -68,4 +68,7 @@ protected:
 			UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);
 
 	ASWeapon* WeaponOwner;
+
+	/** Adjust Initial Launch Angle relatively Gravity force to hit in right place */
+	void AdjustInitialVelocityToHitTarget();
 };
