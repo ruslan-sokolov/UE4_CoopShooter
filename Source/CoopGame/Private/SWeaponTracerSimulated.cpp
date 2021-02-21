@@ -172,15 +172,17 @@ void ASWeaponTracerSimulated::AdjustInitialVelocityToHitTarget()
 {
 	//check(WeaponOwner);
 	
-	// initial data
-	float SimTime = 3.33f; // 1 sec
+	// [TEST DATA] initial data
+	float SimTime = 2.15f; // setup time
 	FVector InitLocation = GetActorLocation();
-	FVector InitVelocity = SphereComp->GetForwardVector() * ProjectileComp->InitialSpeed;
+	float VelMagnitude = ProjectileComp->InitialSpeed;
+	FVector InitVelocity = SphereComp->GetForwardVector() * VelMagnitude;
 	float Gravity = ProjectileComp->GetGravityZ();
 	float Radius = SphereComp->GetScaledSphereRadius();
+	float DrawDebugTime = 30.0f;
 	//
 
-	// use engine simulation to check if correct formula
+	// [TEST CHECK] use engine simulation to check if correct formula
 	FPredictProjectilePathParams PredictParams;
 	PredictParams.StartLocation = InitLocation;
 	PredictParams.LaunchVelocity = InitVelocity;
@@ -191,14 +193,14 @@ void ASWeaponTracerSimulated::AdjustInitialVelocityToHitTarget()
 	PredictParams.SimFrequency = 10.0f;
 	PredictParams.OverrideGravityZ = Gravity;
 	PredictParams.DrawDebugType = EDrawDebugTrace::ForDuration;
-	PredictParams.DrawDebugTime = SimTime;
+	PredictParams.DrawDebugTime = DrawDebugTime;
 
 	FPredictProjectilePathResult PredictResult;
 
 	UGameplayStatics::PredictProjectilePath(GetWorld(), PredictParams, PredictResult);
 	//
 
-	// projectile movement formulas:
+	// [Projectile Movement Formulas]:
 	// compute velocity:
 	// v = v0 + a*t
 
@@ -211,44 +213,72 @@ void ASWeaponTracerSimulated::AdjustInitialVelocityToHitTarget()
 	// p = p0 + v0*t + 1/2*((v1-v0)/t)*t^2
 	// p = p0 + v0*t + 1/2*((v1-v0))*t
 
+	// [My Calculations]
 	// First (Worked just fine)
 	// FVector OneSecVelocity = InitVelocity + FVector(0.0f, 0.0f, Gravity) * SimTime;
 	// FVector OneSecLocation = InitLocation + InitVelocity * SimTime + (OneSecVelocity - InitVelocity) * (0.5f * SimTime);
+	//
 
-	// Optimized
+	// [TEST] Optimized Location Find When Velocity and Time Is known
 	FVector OneSecLocation = InitLocation + (InitVelocity + FVector(0.0f, 0.0f, Gravity * SimTime * 0.5f)) * SimTime;
 
-	DrawDebugSphere(GetWorld(), OneSecLocation, Radius * 1.5f, 12, FColor::Red, false, SimTime);
+	DrawDebugSphere(GetWorld(), OneSecLocation, Radius * 1.5f, 12, FColor::Red, false, DrawDebugTime);
+	//
 
+	// [TEST] Optimized Time Find When Velocity and Location Is known
+	// float a = 0.5f * Gravity;
+	float b = InitVelocity.Z - InitVelocity.X;
+
+	FVector P_Delta = InitLocation - OneSecLocation;
+	// float c = P_Delta.Z - P_Delta.X;
+
+	float ProjectileTime = -(sqrtf(b * b - 2.0f * Gravity * (P_Delta.Z - P_Delta.X)) + b) / Gravity;
+
+	DrawDebugString(GetWorld(), OneSecLocation, *FString::Printf(TEXT("Time: %f"), ProjectileTime), (AActor*)0, FColor::Red, DrawDebugTime, true);
+	//
+
+	// [My Calculations] To Find Velocity X and Z When Velocity Magnitude and Projectile Last Location known:
 	// Quadratic equation in vector form:
 	// 1/2*a*t^2 + v0*t + (p0-p) = 0
 
 	// Kramer method:
 	// {
-	//   0.5*a.x*t^2 + v0.x*t + (p0-p).x = 0,
-	//   0.5*a.y*t^2 + v0.y*t + (p0-p).y = 0,
-	//   0.5*a.z*t^2 + v0.z*t + (p0-p).z = 0
+	//   (1) 0.5*a.x*t^2 + v0.x*t + (p0-p).x = 0,		t-?  v0.x-? v0.z-?
+	//   (2) 0.5*a.y*t^2 + v0.y*t + (p0-p).y = 0,		a.x == 0 and a.y == 0 (gravity has z only)
+	//   (3) 0.5*a.z*t^2 + v0.z*t + (p0-p).z = 0,		v.y, v.z == 0 (velocity move on x only)
+	//   (4) v0.x^2 + v0.z^2 = v0^2
 	// }
-	// a.x == 0 and a.y == 0 (gravity has z only)
-	// v.y, v.z == 0 (velocity move on x only)
 
-	// basically we compute in XY plane, from first and third we have next equation:
-	// 0.5*a.z*t^2 + v0.z*t + (p0-p).z = v0.x*t + (p0-p).x
-	// 0.5*a.z*t^2 + t*(v0.z - v0.x) + (p0-p).z - (p0-p).x = 0 -> We got here quadratic equation is scalar form
+	// Ax^4 + Bx^2 + C = 0
+	// four roots, two negatives, smaller positive - straight trajectory, bigger positive - overhead trajectory
+	// t^2 = ( -a.z*(p0-p).z+v0^2 +- sqrt((a.z*(p0-p).z-v0^2)^2 - a.z^2*((p0-p).z^2+(p0-p).x^2) ) / 0.5*a.z^2
+	// x^2 = sqrt((-b +- sqrt(D)) / 2*a) -  four solutions, we not have interest in two negatives
+	// 
 
-	// Discriminant (Need only positive, time can't be negative):
-	// A*x^2 + B*x + C = 0; x = (-B +- sqrt(B^2 - 4*A*C))/2*A;
-	// A = 0.5 * a.z
-	// B = v0.z - v0.x
-	// C = (p0-p).z - (p0-p).x
+	// [TEST] Optimized Time And Velocity Find X,Z When Velocity Magnitude and Location known:
+	float VelMagnitude_Square = VelMagnitude * VelMagnitude;
+	float B = Gravity * P_Delta.Z - VelMagnitude_Square;
+	float Gravity_Square = Gravity * Gravity;
+	float Discriminant_Sqrt = sqrtf(B * B - Gravity_Square * (P_Delta.Z * P_Delta.Z + P_Delta.X * P_Delta.X));
+	float A_Mult2 = 0.5f * Gravity_Square;
+	
+	float Time1 = sqrtf((-B + Discriminant_Sqrt) / A_Mult2);
+	float Time2 = sqrtf((-B - Discriminant_Sqrt) / A_Mult2);
 
-	// float a = 0.5f * Gravity;
-	float b = InitVelocity.Z - InitVelocity.X;
+	float VelocityX1 = -P_Delta.X / Time1;
+	float VelocityX2 = -P_Delta.Z / Time2;
 
-	FVector delta_p = InitLocation - OneSecLocation;
-	// float c = delta_p.Z - delta_p.X;
+	float VelocityZ1 = sqrtf(VelMagnitude_Square - VelocityX1 * VelocityX1);
+	float VelocityZ2 = sqrtf(VelMagnitude_Square - VelocityX2 * VelocityX2);
 
-	float ComputeTime = -(sqrtf(b * b - 2.0f * Gravity * (delta_p.Z - delta_p.X)) + b) / Gravity;
+	float DBG_VelMagnitude1 = sqrtf(VelocityX1 * VelocityX1 + VelocityZ1 * VelocityZ1);
+	float DBG_VelMagnitude2 = sqrtf(VelocityX2 * VelocityX2 + VelocityZ2 * VelocityZ2);
 
-	DrawDebugString(GetWorld(), OneSecLocation, *FString::Printf(TEXT("Time: %f"), ComputeTime));
+	FString LastTestData = FString::Printf(
+		TEXT(" t1=%f vx1=%f vz1=%f |v1|=%f] \n t2=%f vx2=%f vz2=%f |v2|=%f "), 
+		Time1, VelocityX1, VelocityZ1, DBG_VelMagnitude1, 
+		Time2, VelocityX2, VelocityZ2, DBG_VelMagnitude2
+	);
+	DrawDebugString(GetWorld(), OneSecLocation + FVector(0.0f, 0.0f, -100.0f), *LastTestData, (AActor*)0, FColor::Cyan, DrawDebugTime, true);
+	//
 }
