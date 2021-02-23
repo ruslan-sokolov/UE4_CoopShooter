@@ -70,5 +70,5 @@ protected:
 	ASWeapon* WeaponOwner;
 
 	/** Adjust Initial Launch Angle relatively Gravity force to hit in right place */
-	void AdjustInitialVelocityToHitTarget();
+	void TestAdjustInitialVelocityToHitTarget();
 };

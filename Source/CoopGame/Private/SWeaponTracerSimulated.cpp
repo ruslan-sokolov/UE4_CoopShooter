@@ -64,7 +64,7 @@ void ASWeaponTracerSimulated::BeginPlay()
 
 	if (WeaponOwner != nullptr)
 	{
-		AdjustInitialVelocityToHitTarget();
+		TestAdjustInitialVelocityToHitTarget();
 	}
 	else
 	{
@@ -168,18 +168,18 @@ ASWeaponTracerSimulated* ASWeaponTracerSimulated::SpawnFromWeapon(ASWeapon* Weap
 	return TracerSimulated;
 }
 
-void ASWeaponTracerSimulated::AdjustInitialVelocityToHitTarget()
+void ASWeaponTracerSimulated::TestAdjustInitialVelocityToHitTarget()
 {
 	//check(WeaponOwner);
 	
 	// [TEST DATA] initial data
-	float SimTime = 2.15f; // setup time
+	float SimTime = 1.0f; // setup time
 	FVector InitLocation = GetActorLocation();
 	float VelMagnitude = ProjectileComp->InitialSpeed;
 	FVector InitVelocity = SphereComp->GetForwardVector() * VelMagnitude;
 	float Gravity = ProjectileComp->GetGravityZ();
 	float Radius = SphereComp->GetScaledSphereRadius();
-	float DrawDebugTime = 30.0f;
+	float DrawDebugTime = 15.0f;
 	//
 
 	// [TEST CHECK] use engine simulation to check if correct formula
@@ -214,10 +214,12 @@ void ASWeaponTracerSimulated::AdjustInitialVelocityToHitTarget()
 	// p = p0 + v0*t + 1/2*((v1-v0))*t
 
 	// [My Calculations]
+	//
+	// p = p0 +v0*t + 0.5*((v0 + a*t - v0)*t; p = p0 + v0*t + 0.5*a*t*t; p = p0 + t*(v0 + 0.5*a*t)
 	// First (Worked just fine)
 	// FVector OneSecVelocity = InitVelocity + FVector(0.0f, 0.0f, Gravity) * SimTime;
 	// FVector OneSecLocation = InitLocation + InitVelocity * SimTime + (OneSecVelocity - InitVelocity) * (0.5f * SimTime);
-	//
+
 
 	// [TEST] Optimized Location Find When Velocity and Time Is known
 	FVector OneSecLocation = InitLocation + (InitVelocity + FVector(0.0f, 0.0f, Gravity * SimTime * 0.5f)) * SimTime;
@@ -231,54 +233,66 @@ void ASWeaponTracerSimulated::AdjustInitialVelocityToHitTarget()
 
 	FVector P_Delta = InitLocation - OneSecLocation;
 	// float c = P_Delta.Z - P_Delta.X;
+	float Descr_Sqrt = sqrtf(b * b - 2.0f * Gravity * (P_Delta.Z - P_Delta.X));
+	float ProjectileTime1 = (-b + Descr_Sqrt) / Gravity;
+	float ProjectileTime2 = (-b - Descr_Sqrt) / Gravity;
 
-	float ProjectileTime = -(sqrtf(b * b - 2.0f * Gravity * (P_Delta.Z - P_Delta.X)) + b) / Gravity;
-
-	DrawDebugString(GetWorld(), OneSecLocation, *FString::Printf(TEXT("Time: %f"), ProjectileTime), (AActor*)0, FColor::Red, DrawDebugTime, true);
+	DrawDebugString(GetWorld(), OneSecLocation, *FString::Printf(TEXT("Time1: %f Time2: %f"), ProjectileTime1, ProjectileTime2), (AActor*)0, FColor::Red, DrawDebugTime, true);
 	//
 
-	// [My Calculations] To Find Velocity X and Z When Velocity Magnitude and Projectile Last Location known:
+	// [My Calculations] To Find Velocity (X,Y,Z) When Velocity Magnitude and Projectile Last Location known:
 	// Quadratic equation in vector form:
-	// 1/2*a*t^2 + v0*t + (p0-p) = 0
+	// 1/2*a*t^2 + v0*t + (p0-p) = 0 also v0^2 = v0.x^2 + v0.y^2 + v0.z^2
 
 	// Kramer method:
 	// {
-	//   (1) 0.5*a.x*t^2 + v0.x*t + (p0-p).x = 0,		t-?  v0.x-? v0.z-?
+	//   (1) 0.5*a.x*t^2 + v0.x*t + (p0-p).x = 0,		t-?  v0.x-? v0.y-? v0.z-?
 	//   (2) 0.5*a.y*t^2 + v0.y*t + (p0-p).y = 0,		a.x == 0 and a.y == 0 (gravity has z only)
-	//   (3) 0.5*a.z*t^2 + v0.z*t + (p0-p).z = 0,		v.y, v.z == 0 (velocity move on x only)
-	//   (4) v0.x^2 + v0.z^2 = v0^2
+	//   (3) 0.5*a.z*t^2 + v0.z*t + (p0-p).z = 0,
+	//   (4) v0.x^2 + v0.y^2 + v0.z^2 = v0^2
 	// }
 
-	// Ax^4 + Bx^2 + C = 0
-	// four roots, two negatives, smaller positive - straight trajectory, bigger positive - overhead trajectory
-	// t^2 = ( -a.z*(p0-p).z+v0^2 +- sqrt((a.z*(p0-p).z-v0^2)^2 - a.z^2*((p0-p).z^2+(p0-p).x^2) ) / 0.5*a.z^2
-	// x^2 = sqrt((-b +- sqrt(D)) / 2*a) -  four solutions, we not have interest in two negatives
-	// 
+	// Ax^4 + Bx^2 + C = 0; D=B^2-4*A*C; x^2 = (-B +- sqrt(D))/(2*A); has four solutions
+	// 1/4*a.z^2*t^4 + (a.z*(p0-p).z-v0^2)*t^2 + (p0-p).z^2+(p0-p).y^2+(p0-p).x^2 = 0
+	// t^2 = ( -(a.z*(p0-p).z-v0^2) +- sqrt((a.z*(p0-p).z-v0^2)^2 - a.z^2*((p0-p).z^2+(p0-p).y^2+(p0-p).x^2) / 0.5*a.z^2
+	// t = +-sqrt(t^2)
+	// we have four t roots, 2 negatives, smaller positive - straight trajectory, bigger positive - overhead trajectory
+	// v0.x = -(p0-p).x/t;  v0.y = -(p0-p).y/t;  v0.z = -(p0-p).z/t - 1/2*a.z*t;
 
-	// [TEST] Optimized Time And Velocity Find X,Z When Velocity Magnitude and Location known:
+	// [TEST] Optimized Time And Velocity Find (X,Y,Z) When Velocity Magnitude and Location known:
 	float VelMagnitude_Square = VelMagnitude * VelMagnitude;
 	float B = Gravity * P_Delta.Z - VelMagnitude_Square;
 	float Gravity_Square = Gravity * Gravity;
-	float Discriminant_Sqrt = sqrtf(B * B - Gravity_Square * (P_Delta.Z * P_Delta.Z + P_Delta.X * P_Delta.X));
+	float Discriminant_Sqrt = sqrtf(B * B - Gravity_Square * (P_Delta.Z * P_Delta.Z + P_Delta.X * P_Delta.X + P_Delta.Y * P_Delta.Y));
 	float A_Mult2 = 0.5f * Gravity_Square;
-	
+
 	float Time1 = sqrtf((-B + Discriminant_Sqrt) / A_Mult2);
 	float Time2 = sqrtf((-B - Discriminant_Sqrt) / A_Mult2);
 
 	float VelocityX1 = -P_Delta.X / Time1;
-	float VelocityX2 = -P_Delta.Z / Time2;
+	float VelocityX2 = -P_Delta.X / Time2;
 
-	float VelocityZ1 = sqrtf(VelMagnitude_Square - VelocityX1 * VelocityX1);
-	float VelocityZ2 = sqrtf(VelMagnitude_Square - VelocityX2 * VelocityX2);
+	float VelocityY1 = -P_Delta.Y / Time1;
+	float VelocityY2 = -P_Delta.Y / Time2;
 
-	float DBG_VelMagnitude1 = sqrtf(VelocityX1 * VelocityX1 + VelocityZ1 * VelocityZ1);
-	float DBG_VelMagnitude2 = sqrtf(VelocityX2 * VelocityX2 + VelocityZ2 * VelocityZ2);
+	float VelocityZ1 = -P_Delta.Z / Time1 - Gravity * Time1 * 0.5f;
+	float VelocityZ2 = -P_Delta.Z / Time2 - Gravity * Time2 * 0.5f;
+
+	float DBG_VelMagnitude1 = sqrtf(VelocityX1 * VelocityX1 + VelocityZ1 * VelocityZ1 + VelocityY1 * VelocityY1);
+	float DBG_VelMagnitude2 = sqrtf(VelocityX2 * VelocityX2 + VelocityZ2 * VelocityZ2 + VelocityY2 * VelocityY2);
 
 	FString LastTestData = FString::Printf(
-		TEXT(" t1=%f vx1=%f vz1=%f |v1|=%f] \n t2=%f vx2=%f vz2=%f |v2|=%f "), 
-		Time1, VelocityX1, VelocityZ1, DBG_VelMagnitude1, 
-		Time2, VelocityX2, VelocityZ2, DBG_VelMagnitude2
+		TEXT(" t1=%f vx1=%f vy1=%f vz1=%f |v1|=%f] \n t2=%f vx2=%f vy2=%f vz2=%f |v2|=%f "), 
+		Time1, VelocityX1, VelocityY1, VelocityZ1, DBG_VelMagnitude1, 
+		Time2, VelocityX2, VelocityY2, VelocityZ2, DBG_VelMagnitude2
 	);
-	DrawDebugString(GetWorld(), OneSecLocation + FVector(0.0f, 0.0f, -100.0f), *LastTestData, (AActor*)0, FColor::Cyan, DrawDebugTime, true);
+
+	FString CheckData = FString::Printf(
+		TEXT("t=%f vx=%f, vy=%f, vz=%f |v|=%f"),
+		SimTime, InitVelocity.X, InitVelocity.Y, InitVelocity.Z, VelMagnitude
+	);
+
+	DrawDebugString(GetWorld(), OneSecLocation + FVector(0.0f, 0.0f, -100.0f), *CheckData, (AActor*)0, FColor::Yellow, DrawDebugTime, true);
+	DrawDebugString(GetWorld(), OneSecLocation + FVector(0.0f, 0.0f, -200.0f), *LastTestData, (AActor*)0, FColor::Cyan, DrawDebugTime, true);
 	//
 }
