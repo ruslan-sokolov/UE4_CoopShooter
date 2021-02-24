@@ -71,4 +71,6 @@ protected:
 
 	/** Adjust Initial Launch Angle relatively Gravity force to hit in right place */
 	void TestAdjustInitialVelocityToHitTarget();
+
+	void ComputeProjectileInitialVelocitiesToHitTarget(TArray<FVector>& OutVelocityArray);
 };

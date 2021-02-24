@@ -16,6 +16,7 @@
 ASWeaponTracerSimulated::ASWeaponTracerSimulated()
 {
 	PrimaryActorTick.bCanEverTick = false;
+	SpawnCollisionHandlingMethod = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	SetCanBeDamaged(false);
 
 	SphereComp = CreateDefaultSubobject<USphereComponent>(TEXT("SphereComp"));
@@ -34,7 +35,7 @@ ASWeaponTracerSimulated::ASWeaponTracerSimulated()
 	ProjectileComp = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("ProjectileComp"));
 
 	// projectile movement defaults
-	ProjectileComp->ProjectileGravityScale = 0.0f;
+	ProjectileComp->ProjectileGravityScale = 1.0f;
 	ProjectileComp->InitialSpeed = 30000.0f;
 	ProjectileComp->MaxSpeed = 30000.0f;
 	ProjectileComp->bRotationFollowsVelocity = true;
@@ -43,11 +44,12 @@ ASWeaponTracerSimulated::ASWeaponTracerSimulated()
 	ProjectileComp->Bounciness = 0.2f;
 	ProjectileComp->Friction = 1.0f;
 	ProjectileComp->BounceVelocityStopSimulatingThreshold = 1000.0f;
-
+	
+	ProjectileComp->bAutoActivate = false;
 	ProjectileComp->OnProjectileBounce.AddDynamic(this, &ASWeaponTracerSimulated::OnProjectileBounce);
 
 	// tracer defaults
-	InitialLifeSpan = 4.0f;
+	InitialLifeSpan = 0.5f;
 	bShouldDestroyOnOverlap = true;
 	DestroyOnBounceTime = 0.2f;
 	bShouldDestroyOnSecondBounce = true;
@@ -59,17 +61,21 @@ void ASWeaponTracerSimulated::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// Cast WeaponOwner
-	WeaponOwner = Cast<ASWeapon>(GetOwner());
+	check(WeaponOwner);
 
-	if (WeaponOwner != nullptr)
-	{
-		TestAdjustInitialVelocityToHitTarget();
-	}
-	else
-	{
-		UE_LOG(LogTemp, Warning, TEXT("ASWeaponTracerSimulated::BeginPlay() GetOwner cast to ASWeapon fail, add Owner Weapon as SpawnParameter"));
-	}
+	// TestAdjustInitialVelocityToHitTarget();
+	
+	TArray<FVector> Velocities;
+	ComputeProjectileInitialVelocitiesToHitTarget(Velocities);
+
+	// debug
+	//if (GEngine)
+	//	for (auto& Vel : Velocities)
+	//		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Orange, *Vel.ToString(), false);
+
+	ProjectileComp->Velocity = (Velocities[0]);
+
+	ProjectileComp->Activate();
 }
 
 void ASWeaponTracerSimulated::OnProjectileBounce(const FHitResult& ImpactResult, const FVector& ImpactVelocity)
@@ -93,6 +99,11 @@ void ASWeaponTracerSimulated::OnProjectileBounce(const FHitResult& ImpactResult,
 void ASWeaponTracerSimulated::OnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, 
 	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
+	if (OtherActor == WeaponOwner || OtherActor == WeaponOwner->GetOwner())  // ignore owner weapon
+	{
+		return;
+	}
+
 	// debug
 	// DrawDebugSphere(GetWorld(), GetActorLocation(), 10.0f, 12, FColor::Green, false, 3.0f);
 	
@@ -107,6 +118,11 @@ void ASWeaponTracerSimulated::OnOverlapBegin(UPrimitiveComponent* OverlappedComp
 void ASWeaponTracerSimulated::OnHit(UPrimitiveComponent* HitComponent, AActor* OtherActor, 
 	UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
 {
+	if (OtherActor == WeaponOwner || OtherActor == WeaponOwner->GetOwner())  // ignore owner weapon
+	{
+		return;
+	}
+
 	// handle if tracer should reflect
 	if (BounceAngleToNormalMin > 0.0f)
 	{
@@ -143,34 +159,87 @@ ASWeaponTracerSimulated* ASWeaponTracerSimulated::SpawnFromWeapon(ASWeapon* Weap
 
 	FVector ShotDirection = Weapon->HitScanTrace.ImpactPoint - MuzzleLoc;
 	ShotDirection.Normalize();
-
-	// Normal Spawn
-	FActorSpawnParameters SpawnParamters;
-	// SpawnParamters.Instigator = Weapon->GetInstigator();
-	SpawnParamters.Owner = Weapon;
-	
-	ASWeaponTracerSimulated* TracerSimulated = Weapon->GetWorld()->SpawnActor<ASWeaponTracerSimulated>(
-		Weapon->TracerSimulatedClass, MuzzleLoc, ShotDirection.Rotation(), SpawnParamters);
-	//
 	
 	// Spawn Deferred
-	/*const FTransform Transform(ShotDirection.Rotation(), MuzzleLoc, FVector::OneVector);
+	const FTransform Transform(ShotDirection.Rotation(), MuzzleLoc, FVector::OneVector);
 
 	ASWeaponTracerSimulated* TracerSimulated = Weapon->GetWorld()->SpawnActorDeferred<ASWeaponTracerSimulated>(
-		Weapon->TracerSimulatedClass, Transform);
+		Weapon->TracerSimulatedClass, Transform, Weapon);
 
 	// Do on spawn stuff here
 	TracerSimulated->WeaponOwner = Weapon;
-
-	TracerSimulated->FinishSpawning(Transform);*/
+	TracerSimulated->SphereComp->MoveIgnoreActors.Add(Weapon);
+	TracerSimulated->SphereComp->MoveIgnoreActors.Add(Weapon->GetOwner());
 	//
+
+	TracerSimulated->FinishSpawning(Transform);
+	//	
 
 	return TracerSimulated;
 }
 
+
+void ASWeaponTracerSimulated::ComputeProjectileInitialVelocitiesToHitTarget(TArray<FVector>& OutVelocityArray)
+{
+	// check(WeaponOwner);
+	float Gravity = ProjectileComp->GetGravityZ();
+	float VelMagnitude = ProjectileComp->InitialSpeed;
+	FVector P_Delta = GetActorLocation() - WeaponOwner->HitScanTrace.ImpactPoint;
+
+	if (Gravity == 0.0f)  // need to shoot straight line
+	{
+		FVector Velocity_StraightLine = -P_Delta.GetSafeNormal() * VelMagnitude;
+		OutVelocityArray = { Velocity_StraightLine };
+		return;
+	}
+
+	float VelMagnitude_Square = VelMagnitude * VelMagnitude;
+	float Gravity_Square = Gravity * Gravity;
+
+	float B = Gravity * P_Delta.Z - VelMagnitude_Square;
+	float Discriminant = B * B - Gravity_Square * (P_Delta.Z * P_Delta.Z + P_Delta.X * P_Delta.X + P_Delta.Y * P_Delta.Y);
+	
+	if (Discriminant < 0.0f) // no solution, can't reach target, then add 45degree to reach max distance
+	{
+
+		FVector Velocity_MaxDist(P_Delta.X, P_Delta.Y, 0.0f);
+		Velocity_MaxDist.Normalize();
+		Velocity_MaxDist *= -VelMagnitude * 0.707107f;
+		Velocity_MaxDist.Z = VelMagnitude * 0.707107f;
+		
+		OutVelocityArray = { Velocity_MaxDist };
+	}
+	else
+	{
+		float Discriminant_Sqrt = sqrtf(Discriminant);
+
+		float TimeStraight = sqrtf((-B - Discriminant_Sqrt) / (0.5f * Gravity_Square));
+
+		if (TimeStraight == 0.0f) // need to shot straight line
+		{
+			FVector Velocity_StraightLine = -P_Delta.GetSafeNormal() * VelMagnitude;
+			OutVelocityArray = { Velocity_StraightLine };
+			return;
+		}
+
+		float TimeOverhead = sqrtf((-B + Discriminant_Sqrt) / (0.5f * Gravity_Square));
+		
+		// debug
+		//FString msg = FString::Printf(TEXT("Gravity=%f, P_Delta.Z=%f, B=%f, sqrt(D)=%f, T1=%f T2=%f"), Gravity, P_Delta.Z, B, Discriminant_Sqrt, TimeStraight, TimeOverhead);
+		//if (GEngine)
+		//	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, *msg);
+		//
+
+		FVector Velocity_Straight(-P_Delta.X / TimeStraight, -P_Delta.Y / TimeStraight, -P_Delta.Z / TimeStraight - Gravity * TimeStraight * 0.5f);
+		FVector Velocity_Overhead(-P_Delta.X / TimeOverhead, -P_Delta.Y / TimeOverhead, -P_Delta.Z / TimeOverhead - Gravity * TimeOverhead * 0.5f);
+
+		OutVelocityArray = { Velocity_Straight, Velocity_Overhead };
+	}
+}
+
 void ASWeaponTracerSimulated::TestAdjustInitialVelocityToHitTarget()
 {
-	//check(WeaponOwner);
+	check(WeaponOwner);
 	
 	// [TEST DATA] initial data
 	float SimTime = 1.0f; // setup time
@@ -260,6 +329,7 @@ void ASWeaponTracerSimulated::TestAdjustInitialVelocityToHitTarget()
 	// v0.x = -(p0-p).x/t;  v0.y = -(p0-p).y/t;  v0.z = -(p0-p).z/t - 1/2*a.z*t;
 
 	// [TEST] Optimized Time And Velocity Find (X,Y,Z) When Velocity Magnitude and Location known:
+	
 	float VelMagnitude_Square = VelMagnitude * VelMagnitude;
 	float B = Gravity * P_Delta.Z - VelMagnitude_Square;
 	float Gravity_Square = Gravity * Gravity;
