@@ -688,8 +688,8 @@ void ASWeapon::StopReloadAnim()
 
 void ASWeapon::InterruptReload()
 {
-	if (GetLocalRole() != ROLE_Authority)
-		StopReloadAnim();
+	//if (GetLocalRole() != ROLE_Authority)
+	//	StopReloadAnim();
 
 	ServerInterruptReload();
 
@@ -726,8 +726,8 @@ void ASWeapon::StartReload()
 	if (bIsReloading || AmmoCurrent == AmmoMax)  // client check (same as server check)
 		return;
 
-	if (GetLocalRole() != ROLE_Authority)
-		PlayReloadAnim();
+	//if (GetLocalRole() != ROLE_Authority)
+	//	PlayReloadAnim();
 
 	ServerStartReload();
 
@@ -772,7 +772,8 @@ void ASWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetime
 
 	DOREPLIFETIME(ASWeapon, CharOwner);
 
-	DOREPLIFETIME_CONDITION(ASWeapon, bIsReloading, COND_SkipOwner);
+	//DOREPLIFETIME_CONDITION(ASWeapon, bIsReloading, COND_SkipOwner);
+	DOREPLIFETIME(ASWeapon, bIsReloading);
 	DOREPLIFETIME(ASWeapon, AmmoCurrent);  // temp for cosmetic
 	DOREPLIFETIME(ASWeapon, AmmoMax);  // temp for cosmetic
 	// DOREPLIFETIME(ASWeapon, TimerHandle_FireCoolDown);
