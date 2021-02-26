@@ -10,8 +10,7 @@ class USHealthComponent;
 class URadialForceComponent;
 class UAudioComponent;
 
-// @TODO change to console param
-int32 debugParam = 0;
+static int32 DebugTrackerBot;
 
 UCLASS()
 class COOPGAME_API ASTrackerBot : public APawn
@@ -60,6 +59,8 @@ protected:
 		float MoveControlTick;
 
 	FTimerHandle TimerHandle_MoveControl;
+
+	void ChooseTargetCharacter();
 
 	void UpdateNextPathPoint_WhenReach();
 
@@ -111,6 +112,9 @@ protected:
 		void OnHealthChange_HandleTakeDamage(USHealthComponent* OwningHealthComp, float Health, float HealthDelta,
 			const class UDamageType* InstigatedDamageType, class AController* InstigatedBy, AActor* DamageCauser);
 
+	UFUNCTION()
+		void OnHealthChangedClient();
+
 	// Dynamic material to pulse on damage
 	UMaterialInstanceDynamic* MatInst;
 
@@ -134,7 +138,16 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Tracker Bot: Explosion")
 		bool bExplosionApplyRadialImpulse;
 
-	bool bExploded;
+	void PlayExplosionEffects();
+
+	//UFUNCTION()
+	//	void Destroy_OnPSCExplosionFinish(UParticleSystemComponent* PSC);
+
+	UFUNCTION()
+		void OnRep_Exploded();
+
+	UPROPERTY(ReplicatedUsing=OnRep_Exploded)
+		bool bExploded;
 
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -142,6 +155,9 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Components")
 		UAudioComponent* BounceSound;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Components")
+		UAudioComponent* DelayedDetonationSound;
 
 	/** When on MeshComp simulation hit impulse is lower then this value, sound will not be played */
 	UPROPERTY(EditDefaultsOnly, Category = "Tracker Bot: Sound")
@@ -173,7 +189,13 @@ protected:
 
 	void RunDelayedDetonation();
 
-	bool bDelayedDetonationActivated;
+	void PlayDelayedDetonationEffect();
+
+	UFUNCTION()
+		void OnRep_DelayedDetonationActivated();
+
+	UPROPERTY(ReplicatedUsing=OnRep_DelayedDetonationActivated)
+		bool bDelayedDetonationActivated;
 
 	/** Extra Delay before explosion after jump max height Z reached */
 	UPROPERTY(EditDefaultsOnly, Category = "Tracker Bot: Explosion", meta = (EditCondition = "bJumpAndExplodeNearChasedCharacter"))

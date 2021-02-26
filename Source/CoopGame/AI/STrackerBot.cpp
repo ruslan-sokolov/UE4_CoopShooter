@@ -10,6 +10,16 @@
 #include "../Components/SHealthComponent.h"
 #include "PhysicsEngine/RadialForceComponent.h"
 #include "Components/AudioComponent.h"
+#include "Net/UnrealNetwork.h"
+#include "GameFramework/PlayerState.h"
+#include "Particles/ParticleSystem.h"
+#include "Particles/ParticleSystemComponent.h"
+
+FAutoConsoleVariableRef CVAR_DebugTrackerBot(
+	TEXT("COOP.DebugTrackerBot"),
+	DebugTrackerBot,
+	TEXT("Draw Debug Lines For Weapon Shot Placement"),
+	ECVF_Cheat);
 
 // Sets default values
 ASTrackerBot::ASTrackerBot()
@@ -23,7 +33,6 @@ ASTrackerBot::ASTrackerBot()
 	MeshComp->SetSimulatePhysics(true);
 	MeshComp->SetNotifyRigidBodyCollision(true);
 	MeshComp->SetGenerateOverlapEvents(true);
-	MeshComp->OnComponentHit.AddDynamic(this, &ASTrackerBot::OnMeshCompHit);
 	RootComponent = MeshComp;
 
 	HealthComp = CreateDefaultSubobject<USHealthComponent>(TEXT("HealthComp"));
@@ -40,6 +49,10 @@ ASTrackerBot::ASTrackerBot()
 	BounceSound = CreateDefaultSubobject<UAudioComponent>(TEXT("BounceSound"));
 	BounceSound->SetupAttachment(RootComponent);
 	BounceSound->bAutoActivate = false;
+
+	DelayedDetonationSound = CreateDefaultSubobject<UAudioComponent>(TEXT("DelayedDetonationSound"));
+	DelayedDetonationSound->SetupAttachment(RootComponent);
+	DelayedDetonationSound->bAutoActivate = false;
 
 	// defaults move
 	bUseVelocityChange = true;
@@ -72,24 +85,64 @@ ASTrackerBot::ASTrackerBot()
 	bAddAngularImpulseOnJumpExplosion = true;
 	AngularVelocityOnJumpExplosion = FVector(0.0f, 0.0f, 3000.0f);
 
+	// Replication
+	SetReplicates(true);
+	SetReplicateMovement(true);
+
+	NetUpdateFrequency = 60.0f;
+	MinNetUpdateFrequency = 30.0f;
 }
 
 // Called when the game starts or when spawned
 void ASTrackerBot::BeginPlay()
 {
 	Super::BeginPlay();
-	
+
+	MeshComp->OnComponentHit.AddDynamic(this, &ASTrackerBot::OnMeshCompHit);
+
+
+	if (GetLocalRole() != ROLE_Authority)
+	{
+		HealthComp->OnHealthChangedClient.AddDynamic(this, &ASTrackerBot::OnHealthChangedClient);
+	}
+
 	// Create and set dynamic material instance
 	MatInst = MeshComp->CreateAndSetMaterialInstanceDynamicFromMaterial(0, MeshComp->GetMaterial(0));
 
-	// Hack Init Chased Character 
-	ChasedCharacter = UGameplayStatics::GetPlayerCharacter(this, 0);
+	if (GetLocalRole() == ROLE_Authority)
+	{
+		// Move Tick Enable
+		GetWorldTimerManager().SetTimer(TimerHandle_MoveControl, this, &ASTrackerBot::OnTimer_MoveControl, MoveControlTick, true);
+	}
+}
 
-	// Find initial move to
-	NextPathPoint = GetNextPathPoint();
 
-	// Move Tick Enable
-	GetWorldTimerManager().SetTimer(TimerHandle_MoveControl, this, &ASTrackerBot::OnTimer_MoveControl, MoveControlTick, true);
+void ASTrackerBot::ChooseTargetCharacter()
+{
+	if (ChasedCharacter != nullptr)
+		return;
+
+	ChasedCharacter = UGameplayStatics::GetPlayerCharacter(this, 0);  // if we play as client, it will fire when client will be authorized
+		
+	if (ChasedCharacter)
+	{
+		NextPathPoint = GetNextPathPoint();
+			
+		// debug
+		if (DebugTrackerBot > 0 && GEngine)
+		{
+			int32 PlayerId = 0x7FFFFFFF;
+
+			APlayerController* PlayerController = UGameplayStatics::GetPlayerController(GetWorld(), 0);
+			if (PlayerController)
+				PlayerId = PlayerController->PlayerState->GetPlayerId();
+
+			FString msg = FString::Printf(TEXT("ChasedCharacter Selected %d"), PlayerId);
+
+			GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Purple, *msg);
+		}
+		//
+	}
 }
 
 
@@ -99,6 +152,7 @@ FVector ASTrackerBot::GetNextPathPoint()
 	if (ChasedCharacter == nullptr)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("ASTrackerBot::GetNextPathPoint(), ChasedCharacter is nullptr!!!"));
+		return FVector::ZeroVector;
 	}
 
 	UNavigationPath* NavPath = UNavigationSystemV1::FindPathToActorSynchronously(this, GetActorLocation(), ChasedCharacter);
@@ -117,7 +171,7 @@ FVector ASTrackerBot::GetNextPathPoint()
 	}
 
 	// debug
-	if (debugParam > 0)
+	if (DebugTrackerBot > 0)
 		DrawDebugSphere(GetWorld(), NextPoint, 100.0, 12, FColor::Cyan, false, 3.0f);
 
 	return NextPoint;
@@ -134,7 +188,7 @@ bool ASTrackerBot::IsStuckDesisionMake()
 		StuckDistanceMeasure = (GetActorLocation() - PossibleStuckLocation).Size();
 		
 		// debug
-		if (debugParam > 0)
+		if (DebugTrackerBot > 0)
 			DrawDebugString(GetWorld(), GetActorLocation() + FVector(0.0f, 0.0f, 100.0f), 
 				FString::Printf(TEXT("Delta PossibleStuckLocation: %s,  CountDown TimeToDesideStuck: %s"), 
 					*FString::SanitizeFloat(StuckDistanceMeasure), *FString::SanitizeFloat(TimeToConsiderStuckAccomulation)), (AActor*)0, FColor::Red, MoveControlTick);
@@ -146,7 +200,7 @@ bool ASTrackerBot::IsStuckDesisionMake()
 		StuckDistanceMeasure = (GetActorLocation() - StuckCheck_PrevActorLocation).Size();
 		
 		// debug
-		if (debugParam > 0)
+		if (DebugTrackerBot > 0)
 			DrawDebugString(GetWorld(), GetActorLocation() + FVector(0.0f, 0.0f, 100.0f),
 				FString::Printf(TEXT("Delta PrevLocation: %s,  CountDown TimeToDesideStuck: %s"),
 					*FString::SanitizeFloat(StuckDistanceMeasure), *FString::SanitizeFloat(TimeToConsiderStuckAccomulation)), (AActor*)0, FColor::Orange, MoveControlTick);
@@ -191,7 +245,7 @@ void ASTrackerBot::LaunchOnStuck()
 	MeshComp->AddImpulse(ImpulseTowardsNextPathPoint, NAME_None, bUseVelocityChange);
 
 	// debug
-	if (debugParam > 0)
+	if (DebugTrackerBot > 0)
 		DrawDebugDirectionalArrow(GetWorld(), GetActorLocation(), GetActorLocation() + ImpulseTowardsNextPathPoint, 32, FColor::Blue, false, 3.0f, 0, 2.0f);
 }
 
@@ -223,7 +277,7 @@ void ASTrackerBot::UpdateNextPathPoint_WhenReach()
 		NextPathPoint = GetNextPathPoint();
 
 		// debug
-		if (debugParam > 0)
+		if (DebugTrackerBot > 0)
 			DrawDebugString(GetWorld(), GetActorLocation(), FString::Printf(TEXT("Reached! Next Target Point: %s"), *NextPathPoint.ToString()), (AActor*)0, FColor::Cyan, MoveControlTick, true);
 	}
 }
@@ -233,7 +287,7 @@ void ASTrackerBot::CheckExplodeActivation_OnTimer_MoveControl()
 {
 	if (ChasedCharacter == nullptr)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("ASTrackerBot::CheckExplodeActivation_OnTimer_MoveControl(), ChasedCharacter is nullptr!"));
+		// UE_LOG(LogTemp, Warning, TEXT("ASTrackerBot::CheckExplodeActivation_OnTimer_MoveControl(), ChasedCharacter is nullptr!"));
 		return;
 	}
 
@@ -243,6 +297,24 @@ void ASTrackerBot::CheckExplodeActivation_OnTimer_MoveControl()
 	{
 		bDelayedDetonationActivated = true;
 	}
+}
+
+
+void ASTrackerBot::PlayDelayedDetonationEffect()
+{
+	if (MatInst)
+	{
+		MatInst->SetScalarParameterValue("LastTimeDamageTaken", GetWorld()->TimeSeconds);
+		MatInst->SetScalarParameterValue("PulseMult", 512.0f);
+	}
+
+	DelayedDetonationSound->Play();
+}
+
+
+void ASTrackerBot::OnRep_DelayedDetonationActivated()
+{
+	PlayDelayedDetonationEffect();
 }
 
 
@@ -256,6 +328,8 @@ void ASTrackerBot::RunDelayedDetonation()
 
 	if (bDelayedDetonationActivated)
 	{
+		PlayDelayedDetonationEffect();
+
 		float Gravity = GetWorld()->GetDefaultGravityZ();
 		float JumpZHeight = ChasedCharacter->GetMesh()->GetBoneLocation(ChasedCharacterBoneJumpTo).Z + JumpExtraHeight;
 		float JumpZVelocity = sqrtf(-2.0f * Gravity * JumpZHeight);
@@ -267,12 +341,6 @@ void ASTrackerBot::RunDelayedDetonation()
 
 		if (bAddAngularImpulseOnJumpExplosion)
 			MeshComp->SetPhysicsAngularVelocity(AngularVelocityOnJumpExplosion);
-
-		if (MatInst)
-		{
-			MatInst->SetScalarParameterValue("LastTimeDamageTaken", GetWorld()->TimeSeconds);
-			MatInst->SetScalarParameterValue("PulseMult", 512.0f);
-		}
 
 		// make TrackerBot explode after Selected Bone Z Location Reached
 		FTimerHandle EmptyTimerHandler;
@@ -295,6 +363,9 @@ void ASTrackerBot::OnTimer_MoveControl()
 		RunDelayedDetonation();
 		return;
 	}
+	
+	// choose target
+	ChooseTargetCharacter();
 
 	// check if NextPathPoint reached then update NextPathPoint
 	UpdateNextPathPoint_WhenReach();
@@ -323,7 +394,7 @@ void ASTrackerBot::OnTick_MoveToNextPathPoint()
 	MeshComp->AddForce(ForceDirection, NAME_None, bUseVelocityChange);
 
 	// debug
-	if (debugParam > 0)
+	if (DebugTrackerBot > 0)
 		DrawDebugDirectionalArrow(GetWorld(), GetActorLocation(), GetActorLocation() + ForceDirection, 32, FColor::Yellow, false, 0.0f, 0, 2.0f);
 }
 
@@ -332,7 +403,34 @@ void ASTrackerBot::OnTick_MoveToNextPathPoint()
 void ASTrackerBot::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-	OnTick_MoveToNextPathPoint();
+	
+	if (GetLocalRole() == ROLE_Authority)
+		OnTick_MoveToNextPathPoint();
+}
+
+
+//void ASTrackerBot::Destroy_OnPSCExplosionFinish(UParticleSystemComponent* PSC)
+//{
+//	// debug temp
+//	if (GEngine)
+//		GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Magenta, "Destroy_OnPSCExplosionFinish");
+//	//
+//
+//	Destroy();
+//}
+
+
+void ASTrackerBot::PlayExplosionEffects()
+{
+	UGameplayStatics::PlaySoundAtLocation(GetWorld(), ExplosionSound, GetActorLocation());
+	UParticleSystemComponent* PSC = UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ExplosionEffect, GetActorLocation());
+	//PSC->OnSystemFinished.AddDynamic(this, &ASTrackerBot::Destroy_OnPSCExplosionFinish);
+}
+
+
+void ASTrackerBot::OnRep_Exploded()
+{
+	PlayExplosionEffects();
 }
 
 
@@ -344,10 +442,6 @@ void ASTrackerBot::SelfDestruct()
 	}
 
 	bExploded = true;
-
-	UGameplayStatics::PlaySoundAtLocation(GetWorld(), ExplosionSound, GetActorLocation());
-
-	UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ExplosionEffect, GetActorLocation());
 
 	TArray<AActor*> IgnoredActors;
 	IgnoredActors.Add(this);
@@ -362,12 +456,24 @@ void ASTrackerBot::SelfDestruct()
 		RadialForceComp->FireImpulse();
 	}
 
+	PlayExplosionEffects();
+
 	// debug
-	if (debugParam > 0)
+	if (DebugTrackerBot > 0)
 		DrawDebugSphere(GetWorld(), GetActorLocation(), ExplosionRadius, 12, FColor::Red, false, 5.0f, 0, 1.0f);
 
 	// Delete Actor immediately
-	Destroy();
+	// Destroy();
+	SetLifeSpan(0.15f);  // handled on explosion effect finish event
+}
+
+
+void ASTrackerBot::OnHealthChangedClient()
+{
+	if (MatInst)
+	{
+		MatInst->SetScalarParameterValue("LastTimeDamageTaken", GetWorld()->TimeSeconds);
+	}
 }
 
 
@@ -386,11 +492,21 @@ void ASTrackerBot::OnHealthChange_HandleTakeDamage(USHealthComponent* OwningHeal
 }
 
 
-void ASTrackerBot::OnMeshCompHit(UPrimitiveComponent* HitComponent, AActor* OtherActor, 
+void ASTrackerBot::OnMeshCompHit(UPrimitiveComponent* HitComponent, AActor* OtherActor,
 	UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
 {
 	if (NormalImpulse.Size() > BounceSound_HitImpulseTrashhold)
 	{
 		BounceSound->Play();
 	}
+}
+
+void ASTrackerBot::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(ASTrackerBot, bExploded);
+	// DOREPLIFETIME_CONDITION_NOTIFY(ASTrackerBot, bExploded, COND_Custom, REPNOTIFY_Always);
+
+	DOREPLIFETIME(ASTrackerBot, bDelayedDetonationActivated);
 }
