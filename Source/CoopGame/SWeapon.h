@@ -20,6 +20,7 @@ class UAnimMontage;
 class UAnimInstance;
 class APlayerController;
 class ASWeaponTracerSimulated;
+class ASProjectile;
 
 static int32 DebugWeaponDrawing_Shot;
 static int32 DebugWeaponDrawing_Recoil;
@@ -28,7 +29,16 @@ static int32 DebugWeaponDrawing_RecoilCompensate;
 
 
 UENUM(BlueprintType)
-enum class WeaponFireMode : uint8
+enum class EWeaponFireLogicType : uint8
+{
+	LineTrace,
+	SpawnProjectile,
+	Custom
+};
+
+
+UENUM(BlueprintType)
+enum class EWeaponFireMode : uint8
 {
 
 	Semiauto,
@@ -37,7 +47,7 @@ enum class WeaponFireMode : uint8
 };
 
 UENUM(BlueprintType)
-enum class CharacterAimPose : uint8
+enum class ECharacterAimPose : uint8
 {
 
 	Standing,
@@ -49,15 +59,15 @@ enum class CharacterAimPose : uint8
 	Cover, // never used
 };
 
-FORCEINLINE CharacterAimPose CharStateToAimPose(ECharacterState CharState)
+FORCEINLINE ECharacterAimPose CharStateToAimPose(ECharacterState CharState)
 {
-	if (CharState == ECharacterState::Run) { return CharacterAimPose::Standing; }
-	else if (CharState == ECharacterState::Sprint) { return CharacterAimPose::Standing; }
-	else if (CharState == ECharacterState::Idle) { return CharacterAimPose::Standing; }
-	else if (CharState == ECharacterState::Crouch) { return CharacterAimPose::Crouch; }
-	else if (CharState == ECharacterState::Jumping) { return CharacterAimPose::InAir; }
-	else if (CharState == ECharacterState::Falling) { return CharacterAimPose::InAir; }
-	else { return CharacterAimPose::Standing; }
+	if (CharState == ECharacterState::Run) { return ECharacterAimPose::Standing; }
+	else if (CharState == ECharacterState::Sprint) { return ECharacterAimPose::Standing; }
+	else if (CharState == ECharacterState::Idle) { return ECharacterAimPose::Standing; }
+	else if (CharState == ECharacterState::Crouch) { return ECharacterAimPose::Crouch; }
+	else if (CharState == ECharacterState::Jumping) { return ECharacterAimPose::InAir; }
+	else if (CharState == ECharacterState::Falling) { return ECharacterAimPose::InAir; }
+	else { return ECharacterAimPose::Standing; }
 };
 
 USTRUCT(BlueprintType)
@@ -78,12 +88,12 @@ struct FCharacterShootModifiers
 		float InAirModifier = 3.0f;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Pose Modifiers")
-		TMap<CharacterAimPose, float> CharPoseModifiersMap = {
+		TMap<ECharacterAimPose, float> CharPoseModifiersMap = {
 	
-		{CharacterAimPose::Standing, StandingModifier},
-		{CharacterAimPose::Crouch, CrouchModifier},
-		{CharacterAimPose::Prone, ProneModifier},
-		{CharacterAimPose::InAir, InAirModifier}
+		{ECharacterAimPose::Standing, StandingModifier},
+		{ECharacterAimPose::Crouch, CrouchModifier},
+		{ECharacterAimPose::Prone, ProneModifier},
+		{ECharacterAimPose::InAir, InAirModifier}
 	};
 
 	/** Current Accomulated FireRateModifier. */
@@ -184,7 +194,7 @@ struct FCharacterShootModifiers
 	FORCEINLINE float GetPosModifier() const {return CurrentPosModifier;}
 
 	/** Utility to set Current Pos Modifier */
-	FORCEINLINE float SetPosModifier(CharacterAimPose Pos) { CurrentPosModifier = CharPoseModifiersMap[Pos]; return CurrentPosModifier;  }
+	FORCEINLINE float SetPosModifier(ECharacterAimPose Pos) { CurrentPosModifier = CharPoseModifiersMap[Pos]; return CurrentPosModifier;  }
 
 
 	/** Utility to return current Character Velocity Modifier. */
@@ -422,14 +432,6 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Weapon: Aim")
 		FRecoilInput RecoilParams;
 
-	/**  Base Weapon Damage */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Weapon: Fire")
-		float Damage = 20.0f;
-
-	/**  HeadShot Damage Multiplier */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Weapon: Fire")
-		float HeadshotDamageMultiplier = 16.0f;
-
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon: Aim")
 		bool bCameraShaking = true;
 
@@ -459,9 +461,6 @@ public:
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
 		USkeletalMeshComponent* MeshComp;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon: Fire")
-		TSubclassOf<UDamageType> DamageType;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon: WeaponFX")
 		FName TargetTraceEffect = "Target";
@@ -591,7 +590,6 @@ protected:
 	 /** IF key pressed true. else false */
 	bool bShouldFire;
 
-
 	void WeaponLogicTickClient();
 	void WeaponLogicTickServer();
 	
@@ -603,19 +601,16 @@ protected:
 	FTimerHandle TimerHandle_WeaponTickClient;
 	FTimerHandle TimerHandle_WeaponTickServer;
 
-
 	UFUNCTION()
 		void SemiAutoFireTimerBind(bool ShotDelayed);
 
 	FTimerDelegate SemiAutoFireTimerDel;
 
-	/** Fire Func resolving fire effects and base shoot logic (damage, spread, firerate, firemode, etc) common with all weapons. Better to override this and not Fire() */
-	virtual void FireLogic();
+	void FireLogic_LineTrace();
+	void FireLogic_SpawnProjectile();
 
-
-	/** IF true then when we press shot when cooldown still not complete - shot will be placed as soon as cd finished */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Weapon: Fire")
-		bool bShotCanBeDelayed = true;
+	/** Fire Func resolving fire effects and base shoot logic (damage, spread, firerate, firemode, etc) common with all weapons. */
+	void FireLogic();
 
 	/** Semiauto mode smooth fire rate. */
 	bool bShotIsDelayed;
@@ -637,7 +632,38 @@ protected:
 
 public:
 	// PUBLIC FIRE BLOCK //////////////////////////////////////////////////////////////////////////////////////////////
-	
+
+	/** Handle weapon fire logic type */
+	EWeaponFireLogicType FireLogicType;
+
+	/** SpawnedProjectileClass If WeaponFireLogicType is SpawnProjectile */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon: Fire")
+		TSubclassOf<ASProjectile> Projectile;
+
+	/** If WeaponFireLogicType is LineTrace */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon: Fire")
+		TSubclassOf<UDamageType> DamageType;
+
+	/**  Base Weapon Damage If WeaponFireLogicType is LineTrace */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Weapon: Fire")
+		float Damage = 20.0f;
+
+	/**  HeadShot Damage Multiplier If WeaponFireLogicType is LineTrace */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Weapon: Fire")
+		float HeadshotDamageMultiplier = 16.0f;
+
+	/** IF true then when we press shot when cooldown still not complete - shot will be placed as soon as cd finished */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Weapon: Fire")
+		bool bShotCanBeDelayed = true;
+
+	/**  Weapon Fire rate in sec. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Weapon: Fire")
+		float FireRate = 0.12;
+
+	/** Weapon Fire Mode */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Weapon: Fire")
+		EWeaponFireMode FireMode = EWeaponFireMode::Semiauto;
+
 	/** Used for character controller initialze weapon fire action */
 	FORCEINLINE void SetShouldFire(bool val) { bShouldFire = val;  ServerSetShouldFire(val); }
 
@@ -659,13 +685,6 @@ public:
 	UFUNCTION()
 		void OnRep_HitScanTrace();
 
-	/**  Weapon Fire rate in sec. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Weapon: Fire")
-		float FireRate = 0.12;
-
-	/** Weapon Fire Mode */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Weapon: Fire")
-		WeaponFireMode FireMode = WeaponFireMode::Semiauto;
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 protected:

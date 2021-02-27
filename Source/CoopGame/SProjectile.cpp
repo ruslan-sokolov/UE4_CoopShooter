@@ -15,15 +15,18 @@
 #include "Kismet/GameplayStatics.h"
 #include "Gameframework/DamageType.h"
 #include "DrawDebugHelpers.h"
+#include "Net/UnrealNetwork.h"
 
-// Sets default values
+
 ASProjectile::ASProjectile()
 {
+	PrimaryActorTick.bCanEverTick = false;
+
+	// Components
 	MeshComp = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
 	RootComponent = MeshComp;
 	MeshComp->SetGenerateOverlapEvents(true);
 	MeshComp->SetCollisionProfileName(UCollisionProfile::BlockAll_ProfileName);
-	MeshComp->OnComponentHit.AddDynamic(this, &ASProjectile::OnProjectileHit);
 
 	ProjectileComp = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("Projectile"));
 
@@ -39,81 +42,97 @@ ASProjectile::ASProjectile()
 	MeshComp->SetWalkableSlopeOverride(FWalkableSlopeOverride(WalkableSlope_Unwalkable, 0.f));
 	MeshComp->CanCharacterStepUpOn = ECB_No;
 
-	// Use a ProjectileMovementComponent to govern this projectile's movement
+	// Projectile Component Defaults
 	ProjectileComp->UpdatedComponent = RootComponent;
 	ProjectileComp->InitialSpeed = 3000.f;
 	ProjectileComp->MaxSpeed = 3000.f;
 	ProjectileComp->bRotationFollowsVelocity = true;
 	ProjectileComp->bShouldBounce = true;
 
-	// Die after 3 seconds by default
+	// Life span
 	InitialLifeSpan = 40.0f;
 	
+	// Default Damage Type
 	DamageType = UDamageType::StaticClass();
 
+	// Replication
+	SetReplicates(true);
+	SetReplicateMovement(true);
+
+	NetUpdateFrequency = 60.0f;
+	MinNetUpdateFrequency = 30.0f;
 }
 
-// Called when the game starts or when spawned
 void ASProjectile::BeginPlay()
 {
 	Super::BeginPlay();
-	ProjectileComp->OnProjectileStop.AddDynamic(this, &ASProjectile::OnProjectileStop);
 
-	if (bCanExplode && !bDetonationTriggered && DetonationMode == ProjectileDetonationMode::DetonateOnTimerAfterSpawn)
+	MeshComp->OnComponentHit.AddDynamic(this, &ASProjectile::OnProjectileHit);
+
+	if (GetLocalRole() == ROLE_Authority)
 	{
+		ProjectileComp->OnProjectileStop.AddDynamic(this, &ASProjectile::OnProjectileStop);
 
-		bDetonationTriggered = true;
-		TriggerDetonation(DetonationTime);
-	
+		if (bCanExplode && DetonationMode == EProjectileDetonationMode::DetonateOnTimerAfterSpawn)
+			TriggerDetonation(DetonationTime);
+	}
+}
+
+// detonation
+void ASProjectile::DetonationFX()
+{
+	if (CameraShakeEffect)
+	{
+		APlayerController* PlayerController = UGameplayStatics::GetPlayerController(GetWorld(), 0);
+		if (PlayerController)
+			PlayerController->ClientPlayCameraShake(CameraShakeEffect, 1.0f);
 	}
 
+	if (ImpactSound)
+		UGameplayStatics::PlaySoundAtLocation(GetWorld(), ImpactSound, GetActorLocation());
+	
+	if (ImpactEffect)
+		UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ImpactEffect, GetActorLocation());
 }
 
 void ASProjectile::Detonate() 
 {
+	if (bDetonated)
+		return;
+	bDetonated = true;
 
-	if (CameraShakeEffect) {
-
-		APlayerController* PlayerController = UGameplayStatics::GetPlayerController(GetWorld(), 0);
-
-		if (PlayerController)
-		{
-
-			PlayerController->ClientPlayCameraShake(CameraShakeEffect, 1.0f);
-
-		}
-	}
-
-	// resolve detonation here
-	if (ImpactSound)
-		UGameplayStatics::PlaySoundAtLocation(GetWorld(), ImpactSound, GetActorLocation());
-	if (ImpactEffect)
-		UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ImpactEffect, GetActorLocation());
+	DetonationFX();
 
 	TArray<AActor*> IgnoredActors;
-
 	UGameplayStatics::ApplyRadialDamage(GetWorld(), Damage, GetActorLocation(), DamageRadius, DamageType, IgnoredActors, GetOwner(), GetInstigatorController(), bDoFullDamage);
 
-	//DrawDebugSphere(GetWorld(), GetActorLocation(), DamageRadius, 12, FColor::Red, false, 2.0f);
-
-	Destroy();
+	// Destroy but finish replicatation hack
+	// Destroy();
+	SetLifeSpan(0.1f);
 }
+
+
+void ASProjectile::TriggerDetonationFX()
+{
+	PreDetonationSound->Play();
+}
+
 
 void ASProjectile::TriggerDetonation(float Timer)
 {
+	if (bDetonationTriggered)
+		return;
+	bDetonationTriggered = true;
+
+	TriggerDetonationFX();
 
 	FTimerHandle EmptyTimeHandle;
-
 	GetWorldTimerManager().SetTimer(EmptyTimeHandle, this, &ASProjectile::Detonate, Timer);
-
 }
 
+// projectile component events
 void ASProjectile::OnProjectileStop(const FHitResult& ImpactResult)
 {
-
-	//if (GEngine)
-	//	GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Purple, *FString::Printf(TEXT("STOP PROJECTILE")));
-	
 	MeshComp->SetSimulatePhysics(true);
 	MeshComp->AddForceAtLocationLocal(FVector(20.0f, 0.0f, 0.0f), ImpactResult.ImpactPoint);
 }
@@ -121,28 +140,25 @@ void ASProjectile::OnProjectileStop(const FHitResult& ImpactResult)
 void ASProjectile::OnProjectileHit(UPrimitiveComponent* HitComp, AActor* OtherActor, 
 	UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
 {
-	if (bCanExplode && !bDetonationTriggered)
-	{
-
-		if (DetonationMode == ProjectileDetonationMode::DetonateOnTimerAfterHit) {
-
-			bDetonationTriggered = true;
-			TriggerDetonation(DetonationTime);
-			PreDetonationSound->Play();
+	if (GetLocalRole() == ROLE_Authority)
+		if (bCanExplode)
+		{
+			if (DetonationMode == EProjectileDetonationMode::DetonateOnTimerAfterHit) 
+				TriggerDetonation(DetonationTime);
+			
+			else if (DetonationMode == EProjectileDetonationMode::DetonateOnHit) 
+				Detonate();
 		}
 
-		else if (DetonationMode == ProjectileDetonationMode::DetonateOnHit) {
+	if (BounceSound && !BounceSound->IsPlaying())
+		BounceSound->Play();
+}
 
-			bDetonationTriggered = true;
-			Detonate();
+// net replication
+void ASProjectile::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-		}
-	}
-
-	if (BounceSound) {
-
-		if (!BounceSound->IsPlaying())
-			BounceSound->Play();
-	}
-
+	DOREPLIFETIME(ASProjectile, bDetonated);
+	DOREPLIFETIME(ASProjectile, bDetonationTriggered);
 }

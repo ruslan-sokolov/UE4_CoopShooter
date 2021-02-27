@@ -29,6 +29,9 @@
 
 #include "SWeaponTracerSimulated.h"
 
+#include "SWeapon_Projectile.h"
+#include "SProjectile.h"
+
 
 FAutoConsoleVariableRef CVARDebugWeaponDrawing_Shot(
 	TEXT("COOP.DebugWeapons.Shot"),
@@ -69,7 +72,11 @@ ASWeapon::ASWeapon()
 	// Initialize Hud Spread Values
 	CurrentSpreadAngle = SpreadBaseAngle;
 
+	// Default Damage Type
 	DamageType = UDamageType::StaticClass();
+
+	// Default Projectile To Spawn
+	Projectile = ASProjectile::StaticClass();
 
 	// Reload Anim Speed
 	if (ReloadSpeed < 0.0f)
@@ -312,7 +319,7 @@ void ASWeapon::WeaponLogicTickServer()
 	TimeSinceLastShot += DeltaTime;
 
 	float VelocityModifierNormalized = CharOwner->GetVelocity().Size() / CharOwner->BaseSpeed;
-	CharacterAimPose Pos = CharStateToAimPose(CharOwner->GetState());
+	ECharacterAimPose Pos = CharStateToAimPose(CharOwner->GetState());
 
 	SpreadModifiers.SetPosModifier(Pos);
 	RecoilModifiers.SetPosModifier(Pos);
@@ -404,18 +411,38 @@ void ASWeapon::SemiAutoFireTimerBind(bool ShotDelayed)
 }  // semi-auto shot delayed queue
 
 
-void ASWeapon::FireLogic()
+void ASWeapon::FireLogic_SpawnProjectile()
 {
-	AActor* MyOwner = GetOwner();
-	
-	if (!MyOwner)  // check
+	if (!CharOwner)  // check
 	{
-		UE_LOG(LogTemp, Warning, TEXT("ASWeapon::FireLogic() can't exec, Owner is null ptr!"));
+		UE_LOG(LogTemp, Warning, TEXT("ASWeapon::FireLogic_SpawnProjectile() can't exec, CharOwner is null ptr!"));
+	}
+
+	FVector MuzzleLoc = MeshComp->GetSocketLocation(MuzzleSocketName);
+
+	FActorSpawnParameters ActorSpawnParams;
+	ActorSpawnParams.Instigator = CharOwner;
+	ActorSpawnParams.Owner = this;
+
+	FVector EyeLoc;
+	FRotator EyeRot;
+	CharOwner->GetActorEyesViewPoint(EyeLoc, EyeRot);
+
+	ActorSpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButDontSpawnIfColliding;
+	ASProjectile* ProjectileInst = GetWorld()->SpawnActor<ASProjectile>(Projectile, MuzzleLoc, EyeRot, ActorSpawnParams);
+}
+
+
+void ASWeapon::FireLogic_LineTrace()
+{
+	if (!CharOwner)  // check
+	{
+		UE_LOG(LogTemp, Warning, TEXT("ASWeapon::FireLogic_LineTrace() can't exec, CharOwner is null ptr!"));
 	}
 	
 	FVector EyeLocation;
 	FRotator EyeRotation;
-	MyOwner->GetActorEyesViewPoint(EyeLocation, EyeRotation);
+	CharOwner->GetActorEyesViewPoint(EyeLocation, EyeRotation);
 
 	FVector ShotDirection = EyeRotation.Vector();
 
@@ -423,7 +450,7 @@ void ASWeapon::FireLogic()
 
 	FCollisionQueryParams QueryParams;
 
-	QueryParams.AddIgnoredActor(MyOwner);
+	QueryParams.AddIgnoredActor(CharOwner);
 	QueryParams.AddIgnoredActor(this);
 	QueryParams.bTraceComplex = true;
 	QueryParams.bReturnPhysicalMaterial = true;
@@ -443,7 +470,7 @@ void ASWeapon::FireLogic()
 		if (SurfaceType == SURFACE_FLESHVULNERABLE)
 			CurrentDamage *= HeadshotDamageMultiplier;
 
-		UGameplayStatics::ApplyPointDamage(HitActor, CurrentDamage, ShotDirection, LastHit, MyOwner->GetInstigatorController(), this, DamageType);
+		UGameplayStatics::ApplyPointDamage(HitActor, CurrentDamage, ShotDirection, LastHit, CharOwner->GetInstigatorController(), this, DamageType);
 		//
 
 		// Replication shot fx
@@ -484,6 +511,19 @@ void ASWeapon::FireLogic()
 }  // actual single shot logic (fire line trace)
 
 
+void ASWeapon::FireLogic()
+{
+	if (FireLogicType == EWeaponFireLogicType::LineTrace)
+	{
+		FireLogic_LineTrace();
+	}
+	else if (FireLogicType == EWeaponFireLogicType::SpawnProjectile)
+	{
+		FireLogic_SpawnProjectile();
+	}
+}
+
+
 void ASWeapon::PlayFireEffects()
 {
 	if (MuzzleEffect)
@@ -513,7 +553,7 @@ void ASWeapon::PlayFireEffects()
 }  // fire FX
 
 
-void ASWeapon::PlayImpactEffects()
+void ASWeapon::PlayImpactEffects()  // should call only when WeaponFireLogicType is LineTrace
 {
 	UParticleSystem* SelectedEffect;
 
@@ -572,7 +612,9 @@ void ASWeapon::OnRep_HitScanTrace()
 {
 	// Play cosmetic FX
 	PlayFireEffects();
-	PlayImpactEffects();
+
+	if (FireLogicType == EWeaponFireLogicType::LineTrace)
+		PlayImpactEffects();
 	
 	if (CharOwner && CharOwner->IsLocallyControlled())
 	{
@@ -624,12 +666,17 @@ void ASWeapon::ServerFire_Implementation()
 	} // semiauto and tap handle
 
 	FireLogic();
+	
 	PlayFireEffects();
-	PlayImpactEffects();
+	
+	if (FireLogicType == EWeaponFireLogicType::LineTrace)
+		PlayImpactEffects();
+	
 	PlayCameraShakeEffect();
+	
 	AddRecoil();
 
-	if (FireMode == WeaponFireMode::Fullauto) {
+	if (FireMode == EWeaponFireMode::Fullauto) {
 		GetWorldTimerManager().ClearTimer(TimerHandle_FireCoolDown);
 		GetWorldTimerManager().SetTimer(TimerHandle_FireCoolDown, this, &ASWeapon::Fire, FireRate);
 	} // full auto handle
