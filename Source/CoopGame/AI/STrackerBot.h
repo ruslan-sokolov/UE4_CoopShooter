@@ -212,6 +212,42 @@ protected:
 		FVector AngularVelocityOnJumpExplosion;
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+	// [Tracker bot damage boost] ////////////////////////////////////////////////////////////////////////////////////////
+	
+	/** Allow to increasing damage when other tracker bots are near by */
+	UPROPERTY(EditDefaultsOnly, Category = "Tracker Bot: Damage Boost")
+		bool bAllowDamageBoost;
+
+	/** Time in seconds to update damage boost */
+	UPROPERTY(EditDefaultsOnly, Category = "Tracker Bot: Damage Boost", meta = (EditCondition = "bAllowDamageBoost"))
+		float DamageBoostCheckTime;
+
+	/** Nearby bot check radius*/
+	UPROPERTY(EditDefaultsOnly, Category = "Tracker Bot: Damage Boost", meta = (EditCondition = "bAllowDamageBoost"))
+		float NearbyBotCheckRadius;
+
+	/** Number of nearby bot to max damage boost */
+	UPROPERTY(EditDefaultsOnly, Category = "Tracker Bot: Damage Boost", meta = (EditCondition = "bAllowDamageBoost"))
+		int32 NearbyBotMaxDamageBoost;
+
+	UFUNCTION()
+		void OnRep_DamageBoostUpdated();
+
+	UPROPERTY(ReplicatedUsing=OnRep_DamageBoostUpdated)
+		float CurrentDamageBoostNormalized;
+	
+	float CurrentDamageBoost;
+
+	/** Max Damage boost mult, max val when nearby bot num equal NearbyBotMaxDamageBoost */
+	UPROPERTY(EditDefaultsOnly, Category = "Tracker Bot: Damage Boost", meta = (EditCondition = "bAllowDamageBoost"))
+		float MaxDamageBoost;
+
+	FTimerHandle TimerHandle_CheckDamageBoost;
+
+	void CheckDamageBoost();
+
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;

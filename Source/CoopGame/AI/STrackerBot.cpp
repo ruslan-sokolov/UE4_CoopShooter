@@ -5,6 +5,7 @@
 #include "NavigationSystem.h"
 #include "NavigationPath.h"
 #include "Kismet/GameplayStatics.h"
+#include "Kismet/KismetSystemLibrary.h"
 #include "DrawDebugHelpers.h"
 #include "GameFramework/Character.h"
 #include "../Components/SHealthComponent.h"
@@ -85,6 +86,15 @@ ASTrackerBot::ASTrackerBot()
 	bAddAngularImpulseOnJumpExplosion = true;
 	AngularVelocityOnJumpExplosion = FVector(0.0f, 0.0f, 3000.0f);
 
+	// defaults damage boost
+	bAllowDamageBoost = true;
+	DamageBoostCheckTime = 1.0f;
+	NearbyBotMaxDamageBoost = 5;
+	CurrentDamageBoost = 1.0f;
+	MaxDamageBoost = 5.0f;
+	NearbyBotCheckRadius = 500.0f;
+	CurrentDamageBoostNormalized = 0.0f;
+
 	// Replication
 	SetReplicates(true);
 	SetReplicateMovement(true);
@@ -113,6 +123,9 @@ void ASTrackerBot::BeginPlay()
 	{
 		// Move Tick Enable
 		GetWorldTimerManager().SetTimer(TimerHandle_MoveControl, this, &ASTrackerBot::OnTimer_MoveControl, MoveControlTick, true);
+
+		// Check damage boost
+		GetWorldTimerManager().SetTimer(TimerHandle_CheckDamageBoost, this, &ASTrackerBot::CheckDamageBoost, DamageBoostCheckTime, true);
 	}
 }
 
@@ -360,6 +373,7 @@ void ASTrackerBot::OnTimer_MoveControl()
 	if (bDelayedDetonationActivated)
 	{
 		GetWorldTimerManager().ClearTimer(TimerHandle_MoveControl);
+		GetWorldTimerManager().ClearTimer(TimerHandle_CheckDamageBoost);
 		RunDelayedDetonation();
 		return;
 	}
@@ -398,6 +412,39 @@ void ASTrackerBot::OnTick_MoveToNextPathPoint()
 		DrawDebugDirectionalArrow(GetWorld(), GetActorLocation(), GetActorLocation() + ForceDirection, 32, FColor::Yellow, false, 0.0f, 0, 2.0f);
 }
 
+
+void ASTrackerBot::OnRep_DamageBoostUpdated()
+{
+	if (MatInst)
+	{
+		MatInst->SetScalarParameterValue("PowerLevelAlpha", CurrentDamageBoostNormalized);
+	}
+}
+
+void ASTrackerBot::CheckDamageBoost()
+{
+	TArray<TEnumAsByte<EObjectTypeQuery>> ObjectTypesArray; // object types to trace
+	ObjectTypesArray.Add(UEngineTypes::ConvertToObjectType(ECC_Pawn));
+	TArray<AActor*> OutBots = {};
+	TArray<AActor*> IgnoredBots = {this};
+
+	UKismetSystemLibrary::SphereOverlapActors(GetWorld(), GetActorLocation(), NearbyBotCheckRadius, ObjectTypesArray,
+		ASTrackerBot::StaticClass(), IgnoredBots, OutBots);
+
+	int32 NearbyBotsNum = OutBots.Num();
+
+	if (NearbyBotsNum > NearbyBotMaxDamageBoost)
+		NearbyBotsNum = NearbyBotMaxDamageBoost;
+
+	CurrentDamageBoostNormalized = float(NearbyBotsNum) / float(NearbyBotMaxDamageBoost);
+
+	CurrentDamageBoost = 1.0f + (MaxDamageBoost - 1.0f) * CurrentDamageBoostNormalized;
+
+	if (MatInst)
+	{
+		MatInst->SetScalarParameterValue("PowerLevelAlpha", CurrentDamageBoostNormalized);
+	}
+}
 
 // Called every frame
 void ASTrackerBot::Tick(float DeltaTime)
@@ -447,7 +494,14 @@ void ASTrackerBot::SelfDestruct()
 	IgnoredActors.Add(this);
 
 	// Apply Damage!
-	UGameplayStatics::ApplyRadialDamage(this, ExplosionDamage, GetActorLocation(), ExplosionRadius, DamageType,
+	float Damage = ExplosionDamage;
+
+	if (bAllowDamageBoost)
+	{
+		Damage *= ExplosionDamage * CurrentDamageBoost;
+	}
+
+	UGameplayStatics::ApplyRadialDamage(this, Damage, GetActorLocation(), ExplosionRadius, DamageType,
 		IgnoredActors, nullptr, nullptr, bDoFullDamage);
 
 	// Apply Radial Impulse!
@@ -509,4 +563,5 @@ void ASTrackerBot::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 	// DOREPLIFETIME_CONDITION_NOTIFY(ASTrackerBot, bExploded, COND_Custom, REPNOTIFY_Always);
 
 	DOREPLIFETIME(ASTrackerBot, bDelayedDetonationActivated);
+	DOREPLIFETIME(ASTrackerBot, CurrentDamageBoostNormalized);
 }
