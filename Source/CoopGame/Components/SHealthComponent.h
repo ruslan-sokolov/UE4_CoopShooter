@@ -49,4 +49,8 @@ public:
 		FOnHealthChangedClientSignature OnHealthChangedClient;
 
 	FORCEINLINE float GetHealth() const { return Health; }
+
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "HealthComponent")
+		void Heal(float HealAmount);
+	
 };

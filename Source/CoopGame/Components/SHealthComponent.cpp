@@ -3,6 +3,7 @@
 
 #include "SHealthComponent.h"
 #include "Net/UnrealNetwork.h"
+#include "GameFramework/Actor.h"
 
 // Sets default values for this component's properties
 USHealthComponent::USHealthComponent()
@@ -49,6 +50,32 @@ void USHealthComponent::HandleTakeAnyDamage(AActor* DamagedActor, float Damage,
 
 	OnHealthChanged.Broadcast(this, Health, Damage, DamageType, InstigatedBy, DamageCauser);
 
+}
+
+void USHealthComponent::Heal_Implementation(float HealAmount)
+{
+	if (HealAmount <= 0.0f || Health <= 0.0f)
+	{
+		return;
+	}
+
+	Health = FMath::Clamp(Health + HealAmount, 0.0f, DefaultHealth);
+
+	OnHealthChanged.Broadcast(this, Health, -HealAmount, nullptr, nullptr, nullptr);
+
+	// debug
+	FString OwnerName;
+	
+	AActor* Owner = GetOwner();
+	if (Owner != nullptr) OwnerName = Owner->GetName();
+	
+	FString Msg = FString::Printf(TEXT("%s Health Changed: %s (+%s)"), *OwnerName, *FString::SanitizeFloat(Health), *FString::SanitizeFloat(HealAmount));
+	
+	UE_LOG(LogTemp, Warning, TEXT("%s"), *Msg);
+
+	if (GEngine)
+		GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Magenta, Msg);
+	//
 }
 
 

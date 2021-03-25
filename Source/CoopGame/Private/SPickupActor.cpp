@@ -5,14 +5,22 @@
 
 #include "Components/SphereComponent.h"
 #include "Components/DecalComponent.h"
-
+#include "Engine/CollisionProfile.h"
 #include "SPowerUpActor.h"
+
+#include "../SCharacter.h"
 
 // Sets default values
 ASPickupActor::ASPickupActor()
 {
 	SphereComp = CreateDefaultSubobject<USphereComponent>(TEXT("SphereComp"));
 	SphereComp->SetSphereRadius(75.0f);
+
+	// collision response
+	SphereComp->SetCollisionProfileName(UCollisionProfile::BlockAllDynamic_ProfileName);
+	SphereComp->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
+	SphereComp->SetCollisionResponseToChannel(ECollisionChannel::ECC_Pawn, ECollisionResponse::ECR_Overlap);
+	
 	RootComponent = SphereComp;
 
 	DecalComp = CreateDefaultSubobject<UDecalComponent>(TEXT("DecalComp"));
@@ -50,7 +58,7 @@ void ASPickupActor::NotifyActorBeginOverlap(AActor* OtherActor)
 {
 	Super::NotifyActorBeginOverlap(OtherActor);
 
-	if (PowerUpInstance)
+	if (Cast<ASCharacter>(OtherActor) && PowerUpInstance)  // overlap with scharacter only
 	{
 		PowerUpInstance->ActivatePowerup();
 		PowerUpInstance = nullptr;
@@ -58,7 +66,5 @@ void ASPickupActor::NotifyActorBeginOverlap(AActor* OtherActor)
 		// Set timer to respawn
 		GetWorldTimerManager().SetTimer(TimerHandle_RespawnPowerUp, this, &ASPickupActor::Respawn, CooldownDuration);
 	}
-
-	// @TODO: Grant power up to player if available
 }
 
