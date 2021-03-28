@@ -2,6 +2,7 @@
 
 
 #include "SPowerUpActor.h"
+#include "Net/UnrealNetwork.h"
 
 // Sets default values
 ASPowerUpActor::ASPowerUpActor()
@@ -9,12 +10,10 @@ ASPowerUpActor::ASPowerUpActor()
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PowerupInterval = 0.0f;
 	TotalNrOfTicks = 0;
-}
 
-// Called when the game starts or when spawned
-void ASPowerUpActor::BeginPlay()
-{
-	Super::BeginPlay();
+	bIsPowerupActive = false;
+
+	SetReplicates(true);
 }
 
 void ASPowerUpActor::OnTickPowerup()
@@ -26,6 +25,9 @@ void ASPowerUpActor::OnTickPowerup()
 	if (TicksProcessed >= TotalNrOfTicks)
 	{
 
+		bIsPowerupActive = false;
+		OnRep_PowerupActive(); // call replication function on server manually
+
 		OnExpired();
 
 		// Delete timer
@@ -33,9 +35,17 @@ void ASPowerUpActor::OnTickPowerup()
 	}
 }
 
-void ASPowerUpActor::ActivatePowerup()
+void ASPowerUpActor::OnRep_PowerupActive()
 {
-	OnActivated();
+	OnPowerupStateChanged(bIsPowerupActive);
+}
+
+void ASPowerUpActor::ActivatePowerup(AActor* ActorPicker)
+{
+	OnActivated(ActorPicker);
+
+	bIsPowerupActive = true;
+	OnRep_PowerupActive(); // call replication function on server manually
 
 	if (PowerupInterval > 0.0f)
 	{
@@ -45,4 +55,11 @@ void ASPowerUpActor::ActivatePowerup()
 	{
 		OnTickPowerup();
 	}
+}
+
+void ASPowerUpActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(ASPowerUpActor, bIsPowerupActive);
 }

@@ -682,7 +682,9 @@ void ASWeapon::ServerFire_Implementation()
 	} // full auto handle
 
 	ShotCount++;
-	AmmoCurrent--;
+
+	if (!(CharOwner && CharOwner->bBoostNoAmmoActive)) // check no ammo boost
+		AmmoCurrent--;
 
 	TimeSinceLastShot = WEAPON_TICK;
 	bShotIsDelayed = false;

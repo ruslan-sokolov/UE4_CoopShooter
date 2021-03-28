@@ -43,6 +43,8 @@ ASCharacter::ASCharacter()
 	HealthComp = CreateDefaultSubobject<USHealthComponent>(TEXT("HealthComp"));
 
 	HealthComp->OnHealthChanged.AddDynamic(this, &ASCharacter::OnHealthChanged);
+
+	bBoostNoAmmoActive = false;
 }
 
 // Called when the game starts or when spawned

@@ -232,4 +232,10 @@ public:
 			const class UDamageType* DamageType, class AController* InstigatedBy, AActor* DamageCauser);
 	
 	//
+
+public:
+
+	// boosts
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+		bool bBoostNoAmmoActive;
 };

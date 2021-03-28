@@ -30,6 +30,8 @@ ASPickupActor::ASPickupActor()
 
 	// defaults
 	CooldownDuration = 1.0f;
+
+	SetReplicates(true);
 }
 
 // Called when the game starts or when spawned
@@ -37,7 +39,10 @@ void ASPickupActor::BeginPlay()
 {
 	Super::BeginPlay();
 	
-	Respawn();
+	if (GetLocalRole() == ROLE_Authority)
+	{
+		Respawn();
+	}
 }
 
 void ASPickupActor::Respawn()
@@ -58,9 +63,9 @@ void ASPickupActor::NotifyActorBeginOverlap(AActor* OtherActor)
 {
 	Super::NotifyActorBeginOverlap(OtherActor);
 
-	if (Cast<ASCharacter>(OtherActor) && PowerUpInstance)  // overlap with scharacter only
+	if (GetLocalRole() == ROLE_Authority && Cast<ASCharacter>(OtherActor) && PowerUpInstance)  // overlap with scharacter only
 	{
-		PowerUpInstance->ActivatePowerup();
+		PowerUpInstance->ActivatePowerup(OtherActor);
 		PowerUpInstance = nullptr;
 
 		// Set timer to respawn
