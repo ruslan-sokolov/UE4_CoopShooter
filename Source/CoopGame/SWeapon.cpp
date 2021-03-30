@@ -139,7 +139,7 @@ void ASWeapon::ClientAttachToASCharacter_Implementation()
 {
 	if (!CharOwner)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("ASWeapon::ClientAttachToASCharacter can't run, CharOwner is null ptr!"));
+		UE_LOG(LogTemp, Warning, TEXT("%s ASWeapon::ClientAttachToASCharacter can't run, CharOwner is null ptr!"), *GetName());
 	}
 
 	// Weapon Crosshair Resolve
@@ -162,7 +162,7 @@ void ASWeapon::ClientAttachToASCharacter_Implementation()
 void ASWeapon::ServerAttachToASCharacter_Implementation(ASCharacter* Character)
 {
 	if (!Character || Character->GetState() == ECharacterState::Dead) {
-		UE_LOG(LogTemp, Warning, TEXT("Attempt to attach weapon to invalid character"))
+		UE_LOG(LogTemp, Warning, TEXT("%s Attempt to attach weapon to invalid character"), *GetName());
 			return;
 	}
 
@@ -211,7 +211,7 @@ void ASWeapon::AddRecoil()
 	// check
 	if (!CharOwner)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("ASWeapon::AddRecoil() CharOwner is null ptr!"));
+		UE_LOG(LogTemp, Warning, TEXT("%s ASWeapon::AddRecoil() CharOwner is null ptr!"), *GetName());
 		return;
 	}
 
@@ -219,7 +219,7 @@ void ASWeapon::AddRecoil()
 
 	if (!OwnerPlayerController) // if character is not player return
 	{
-		UE_LOG(LogTemp, Warning, TEXT("ASWeapon::AddRecoil() OwnerPlayerController is null ptr! "));
+		UE_LOG(LogTemp, Warning, TEXT("%s ASWeapon::AddRecoil() OwnerPlayerController is null ptr!"), *GetName());
 		return;
 	}
 	//
@@ -242,17 +242,17 @@ void ASWeapon::AddRecoil()
 void ASWeapon::CompensateRecoil(float DeltaSec)
 {
 	// check
-	if (!CharOwner)
+	if (CharOwner == nullptr)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("ASWeapon::CompensateRecoil() CharOwner is null ptr!"));
+		UE_LOG(LogTemp, Warning, TEXT("%s ASWeapon::CompensateRecoil() CharOwner is null ptr!"), *GetName());
 		return;
 	}
 
 	APlayerController* OwnerPlayerController = Cast<APlayerController>(CharOwner->GetController());
 
-	if (!OwnerPlayerController)
+	if (OwnerPlayerController == nullptr)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("ASWeapon::CompensateRecoil() OwnerPlayerController is null ptr!"));
+		UE_LOG(LogTemp, Warning, TEXT("%s ASWeapon::CompensateRecoil() OwnerPlayerController is null ptr!"), *GetName());
 		return;
 	}
 	//
@@ -262,7 +262,6 @@ void ASWeapon::CompensateRecoil(float DeltaSec)
 		RecoilParams.ClearRecoilAcommulation();
 	}
 	else if (TimeSinceLastShot >= RecoilParams.RecoilFadeDelay || RecoilParams.RecoilFadeProgress > 0.0f) {
-
 		float PitchCompensation = -RecoilParams.RecoilAccumulationPitch * DeltaSec * RecoilParams.RecoilFadeTime;
 		RecoilParams.RecoilAccumulationPitch += PitchCompensation;
 
@@ -348,7 +347,7 @@ void ASWeapon::WeaponLogicTickClient()
 {
 	if (!CharOwner) // check
 	{
-		UE_LOG(LogTemp, Warning, TEXT("ASWeapon::LogicTickClient() can't exec, CharOwner is nullptr!"));
+		UE_LOG(LogTemp, Warning, TEXT("%s ASWeapon::LogicTickClient() can't exec, CharOwner is nullptr!"), *GetName());
 		return;
 	}
 
@@ -362,7 +361,7 @@ void ASWeapon::EnableWeaponLogicTick(bool Enable)
 	if (Enable) 
 	{
 		if (!CharOwner) {
-			UE_LOG(LogTemp, Warning, TEXT("Can't Enable Client Weapon Tick When weapon hasn't attached to character"));
+			UE_LOG(LogTemp, Warning, TEXT("%s Can't Enable Client Weapon Tick When weapon hasn't attached to character"), *GetName());
 			return;
 		}
 
@@ -373,7 +372,7 @@ void ASWeapon::EnableWeaponLogicTick(bool Enable)
 		} 
 		else
 		{
-			UE_LOG(LogTemp, Warning, TEXT("ASWeapon::EnableWeaponLogicTick() WeaponTickClient can't run, CharOwner not LocalyControlled"));
+			UE_LOG(LogTemp, Warning, TEXT("%s ASWeapon::EnableWeaponLogicTick() WeaponTickClient can't run, CharOwner not LocalyControlled"), *GetName());
 		}
 	}
 	else
@@ -388,7 +387,7 @@ void ASWeapon::ServerEnableWeaponLogicTick_Implementation(bool Enable)
 	if (Enable)
 	{
 		if (!CharOwner) {
-			UE_LOG(LogTemp, Warning, TEXT("Can't Enable Server Weapon Tick When weapon hasn't attached to character"));
+			UE_LOG(LogTemp, Warning, TEXT("%s Can't Enable Server Weapon Tick When weapon hasn't attached to character"), *GetName());
 			return;
 		}
 
@@ -415,7 +414,7 @@ void ASWeapon::FireLogic_SpawnProjectile()
 {
 	if (!CharOwner)  // check
 	{
-		UE_LOG(LogTemp, Warning, TEXT("ASWeapon::FireLogic_SpawnProjectile() can't exec, CharOwner is null ptr!"));
+		UE_LOG(LogTemp, Warning, TEXT("%s ASWeapon::FireLogic_SpawnProjectile() can't exec, CharOwner is null ptr!"), *GetName());
 	}
 
 	FVector MuzzleLoc = MeshComp->GetSocketLocation(MuzzleSocketName);
@@ -437,7 +436,7 @@ void ASWeapon::FireLogic_LineTrace()
 {
 	if (!CharOwner)  // check
 	{
-		UE_LOG(LogTemp, Warning, TEXT("ASWeapon::FireLogic_LineTrace() can't exec, CharOwner is null ptr!"));
+		UE_LOG(LogTemp, Warning, TEXT("%s ASWeapon::FireLogic_LineTrace() can't exec, CharOwner is null ptr!"), *GetName());
 	}
 	
 	FVector EyeLocation;
@@ -590,7 +589,7 @@ void ASWeapon::PlayCameraShakeEffect()
 {
 	if (!CharOwner)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("ASWeapon::PlayCameraShakeEffect() CharOwner is null ptr!"));
+		UE_LOG(LogTemp, Warning, TEXT("%s ASWeapon::PlayCameraShakeEffect() CharOwner is null ptr!"), *GetName());
 		return;
 	}
 
@@ -598,7 +597,7 @@ void ASWeapon::PlayCameraShakeEffect()
 
 	if (!OwnerPlayerController)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("ASWeapon::PlayCameraShakeEffect() OwnerPlayerController is null ptr!"));
+		UE_LOG(LogTemp, Warning, TEXT("%s ASWeapon::PlayCameraShakeEffect() OwnerPlayerController is null ptr!"), *GetName());
 		return;
 	}
 
@@ -713,7 +712,7 @@ void ASWeapon::PlayReloadAnim()
 	}
 	else
 	{
-		UE_LOG(LogTemp, Warning, TEXT("ASWeapon::PlayReloadAnim NOT FOUND CharOwner !!"));
+		UE_LOG(LogTemp, Warning, TEXT("%s ASWeapon::PlayReloadAnim NOT FOUND CharOwner !!"), *GetName());
 	}
 
 }  // play reload anim
@@ -730,7 +729,7 @@ void ASWeapon::StopReloadAnim()
 	}
 	else
 	{
-		UE_LOG(LogTemp, Warning, TEXT("ASWeapon::PlayReloadAnim NOT FOUND CharOwner !!"));
+		UE_LOG(LogTemp, Warning, TEXT("%s ASWeapon::PlayReloadAnim NOT FOUND CharOwner !!"), *GetName());
 	}
 
 }  // stop reload anim
