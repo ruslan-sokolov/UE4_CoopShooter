@@ -397,6 +397,12 @@ void ASCharacter::OnHealthChanged(USHealthComponent* OwningHealthComp, float Hea
 		bUseControllerRotationYaw = false;
 
 		SetLifeSpan(10.0f);
+
+		// ToDo: use detach weapon
+		if (Weapon)
+		{
+			Weapon->Destroy();
+		}
 	}
 
 }

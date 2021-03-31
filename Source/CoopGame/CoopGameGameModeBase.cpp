@@ -6,6 +6,7 @@
 #include "CoopHUD.h"
 #include "CoopGameState.h"
 #include "SCharacter.h"
+#include "CoopPlayerState.h"
 
 #include "Components/SHealthComponent.h"
 
@@ -32,6 +33,13 @@ ACoopGameGameModeBase::ACoopGameGameModeBase()
 		GameStateClass = GameStateFinder.Class;
 	else
 		GameStateClass = ACoopGameState::StaticClass();
+
+	// custom player state
+	static ConstructorHelpers::FClassFinder<APlayerState> PlayerStateFinder(TEXT("/Game/Blueprints/GameMode/BP_PlayerState"));
+	if (PlayerStateFinder.Succeeded())
+		PlayerStateClass = PlayerStateFinder.Class;
+	else
+		PlayerStateClass = ACoopPlayerState::StaticClass();
 
 	// bot spawn defaults
 	NrOfBotsToSpawn = 0;
@@ -69,16 +77,22 @@ void ACoopGameGameModeBase::StartWave()
 
 	// start inf loop of actual bot spawn
 	GetWorldTimerManager().SetTimer(TimerHandle_BotSpawner, this, &ACoopGameGameModeBase::SpawnBotTimerElapsed, TimeBetweenBotSpawnInWave, true, 0.0);
+
+	SetWaveState(EWaveState::WaveInProgress);
 }
 
 void ACoopGameGameModeBase::EndWave()
 {
 	GetWorldTimerManager().ClearTimer(TimerHandle_BotSpawner);
+
+	SetWaveState(EWaveState::WaitingToComplete);
 }
 
 void ACoopGameGameModeBase::PrepareForNextWave()
 {
 	GetWorldTimerManager().SetTimer(TimerHandle_NextWaveStart, this, &ACoopGameGameModeBase::StartWave, TimeBetweenWaves, false);
+
+	SetWaveState(EWaveState::PreparingNextWave);
 }
 
 void ACoopGameGameModeBase::CheckWaveState()
@@ -116,13 +130,67 @@ void ACoopGameGameModeBase::CheckWaveState()
 			GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Yellow, "[GameMode] Prep next spawn wave");
 		//
 
+		SetWaveState(EWaveState::WaveComplete);
+
 		PrepareForNextWave();
+	}
+}
+
+void ACoopGameGameModeBase::CheckAnyPlayerAlive()
+{
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		APlayerController* PC = It->Get();
+
+		if (PC)
+		{
+			APawn* PlayerPawn = PC->GetPawn();
+
+			if (PlayerPawn)
+			{
+				USHealthComponent* HealthComp =  Cast<USHealthComponent>(PlayerPawn->GetComponentByClass(USHealthComponent::StaticClass()));
+			
+				if (ensure(HealthComp) && HealthComp->GetHealth() > 0.0f)
+				{
+					// A Player is still alive
+					return;
+				}
+			}
+		}
+	}
+
+	// No Player alive
+	GameOver();
+}
+
+void ACoopGameGameModeBase::GameOver()
+{
+	EndWave();
+
+	// @ToDo: finish up the match, present "Game over" to players
+
+	// debug
+	if (GEngine)
+		GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Yellow, "[GameMode] Game over. All players are dead.");
+	//
+
+	SetWaveState(EWaveState::GameOver);
+}
+
+void ACoopGameGameModeBase::SetWaveState(EWaveState NewState)
+{
+	ACoopGameState* GS = GetGameState<ACoopGameState>();
+	if (ensureAlways(GS))
+	{
+		GS->SetWaveState(NewState);
 	}
 }
 
 void ACoopGameGameModeBase::StartPlay()
 {
 	Super::StartPlay();
+
+	SetWaveState(EWaveState::WaitingToStart);
 
 	PrepareForNextWave();  // first wave inititialize
 }
@@ -132,4 +200,5 @@ void ACoopGameGameModeBase::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 
 	CheckWaveState();
+	CheckAnyPlayerAlive();
 }

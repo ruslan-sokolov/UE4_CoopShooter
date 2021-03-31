@@ -518,6 +518,8 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon: UMG")
 		TSubclassOf<class USCrosshairWidget> CrosshairOverride;
 
+	// @ToDo: detach weapon from character
+
 	/** Attach Weapon To Character */
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Weapon: Use")
 		void ServerAttachToASCharacter(ASCharacter* Character);

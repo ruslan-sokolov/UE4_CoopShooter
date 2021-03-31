@@ -6,6 +6,11 @@
 #include "GameFramework/GameModeBase.h"
 #include "CoopGameGameModeBase.generated.h"
 
+enum class EWaveState : uint8;
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnActorKilled, AActor*, VictimActor, AActor*, KillerActor, AController*, KillerController);
+
+
 /**
  * 
  */
@@ -68,11 +73,20 @@ protected:
 	// check and if can prepare next wave, exec if so
 	void CheckWaveState();
 
+	void CheckAnyPlayerAlive();
+
+	void GameOver();
+
+	void SetWaveState(EWaveState NewState);
+
 public:
 
 	/** Transitions to calls BeginPlay on actors. */
 	virtual void StartPlay() override;
 
 	virtual void Tick(float DeltaTime) override;
+
+	UPROPERTY(BlueprintAssignable, Category = "GameMode")
+		FOnActorKilled OnActorKilled;
 
 };
