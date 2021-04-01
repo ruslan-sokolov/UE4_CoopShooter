@@ -79,6 +79,8 @@ protected:
 
 	void SetWaveState(EWaveState NewState);
 
+	void RestartDeadPlayers();
+
 public:
 
 	/** Transitions to calls BeginPlay on actors. */

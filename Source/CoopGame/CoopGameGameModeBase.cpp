@@ -93,6 +93,8 @@ void ACoopGameGameModeBase::PrepareForNextWave()
 	GetWorldTimerManager().SetTimer(TimerHandle_NextWaveStart, this, &ACoopGameGameModeBase::StartWave, TimeBetweenWaves, false);
 
 	SetWaveState(EWaveState::PreparingNextWave);
+
+	RestartDeadPlayers();
 }
 
 void ACoopGameGameModeBase::CheckWaveState()
@@ -183,6 +185,18 @@ void ACoopGameGameModeBase::SetWaveState(EWaveState NewState)
 	if (ensureAlways(GS))
 	{
 		GS->SetWaveState(NewState);
+	}
+}
+
+void ACoopGameGameModeBase::RestartDeadPlayers()
+{
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		APlayerController* PC = It->Get();
+		if (PC && PC->GetPawn() == nullptr)
+		{
+			RestartPlayer(PC);
+		}
 	}
 }
 
