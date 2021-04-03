@@ -17,6 +17,9 @@ class FString;
 
 class USHealthComponent;
 
+// class ASCharacter;
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnCharacterWeaponSpawned, ASCharacter*, Character, ASWeapon*, Weapon);
+
 UENUM(BlueprintType)
 enum class ECharacterState : uint8
 {
@@ -183,10 +186,14 @@ public:
 	void BeginZoom();
 	void EndZoom();
 
-	void Fire();
-	void StopFire();
+	UFUNCTION(BlueprintCallable, Category = "Character: Combat")
+		void Fire();
+	
+	UFUNCTION(BlueprintCallable, Category = "Character: Combat")
+		void StopFire();
 
-	void Reload();
+	UFUNCTION(BlueprintCallable, Category = "Character: Combat")
+		void Reload();
 
 	/** Spawning and Attaching weapon to character */
 	UFUNCTION(BlueprintCallable, Category = "Chracter: Combat")
@@ -194,6 +201,9 @@ public:
 
 	UFUNCTION(Server, Reliable)
 		void ServerSpawnWeapon(TSubclassOf<ASWeapon> WeaponClass);
+
+	UPROPERTY(BlueprintAssignable, Category = "Character: Combat")
+		FOnCharacterWeaponSpawned OnCharacterWeaponSpawned;
 
 	/** Carried Weapon Speed modifier **/
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Chracter: Combat")

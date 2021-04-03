@@ -26,36 +26,40 @@ protected:
 	FTimerHandle TimerHandle_BotSpawner;
 	FTimerHandle TimerHandle_NextWaveStart;
 
-	/** Bots mult num to spawn in single wave, total bots spawn num in wave = WaveCount * NrOfBotsToSpawnMult */
+	/** Run Game with Wave Spawn */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "BotSpawn")
+		bool bWaveSpawnEnableOnStart;
+
+	/** Bots mult num to spawn in single wave, total bots spawn num in wave = WaveCount * NrOfBotsToSpawnMult */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "BotSpawn", meta = (EditCondition = "bWaveSpawnEnableOnStart"))
 		int32 NrOfBotsToSpawnMult;
 
 	/** Bots num to spawn left in current wave */
-	UPROPERTY(BlueprintReadOnly, Category = "BotSpawn")
+	UPROPERTY(BlueprintReadOnly, Category = "BotSpawn", meta = (EditCondition = "bWaveSpawnEnableOnStart"))
 		int32 NrOfBotsToSpawn;
 
 	/** Max number of bots to spawn per wave */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "BotSpawn")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "BotSpawn", meta = (EditCondition = "bWaveSpawnEnableOnStart"))
 		int32 MaxNrOfBotsToSpawnPerWave;
 	
 	/** Current wave number */
-	UPROPERTY(BlueprintReadOnly, Category = "BotSpawn")
+	UPROPERTY(BlueprintReadOnly, Category = "BotSpawn", meta = (EditCondition = "bWaveSpawnEnableOnStart"))
 		int32 WaveCount;
 	
 	// Max number of spawn waves. If 0, then no spawn wave limit
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "BotSpawn")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "BotSpawn", meta = (EditCondition = "bWaveSpawnEnableOnStart"))
 		int32 MaxWaveNr;
 
 	/** Time wait in wave to spawn single bot in wave*/
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "BotSpawn")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "BotSpawn", meta = (EditCondition = "bWaveSpawnEnableOnStart"))
 		float TimeBetweenBotSpawnInWave;
 
 	/** Time wait to start next spawn wave */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "BotSpawn")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "BotSpawn", meta = (EditCondition = "bWaveSpawnEnableOnStart"))
 		float TimeBetweenWaves;
 
 	// Hook for BP spawn a single bot
-	UFUNCTION(BlueprintImplementableEvent, Category = "BotSpawn")
+	UFUNCTION(BlueprintImplementableEvent, Category = "BotSpawn", meta = (EditCondition = "bWaveSpawnEnableOnStart"))
 	void SpawnNewBot();
 
 	// call BP Hook for spawn a single bot

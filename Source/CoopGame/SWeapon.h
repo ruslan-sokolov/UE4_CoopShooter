@@ -10,6 +10,8 @@
 
 #include "SWeapon.generated.h"
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnNoAmmoLeft, ASWeapon*, Weapon);
+
 class USkeletalMeshComponent;
 class UDamageClass;
 class UParticleSystem;
@@ -406,9 +408,11 @@ public:
 	virtual void Tick(float DeltaTime) override;
 
 protected:
+
 	virtual void BeginPlay() override;
 
 public:
+
 	/**  Temporarly Change Player Camera FOV when aiming. 0 - don't change fov */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Weapon: Aim")
 		float ZoomFOV = 60.0f;
@@ -438,6 +442,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon: Aim", meta = (EditCondition = "bCameraShaking"))
 		float CameraShakeScale = 1.0f;
 
+
 	/** Mag Ammo Capacity */
 	UPROPERTY(Replicated, EditAnywhere, BlueprintReadWrite, Category = "Weapon: Ammo")
 		int32 AmmoMax = 30;
@@ -445,7 +450,14 @@ public:
 	/** Current Ammo in Mag */
 	UPROPERTY(Replicated, EditAnywhere, BlueprintReadWrite, Category = "Weapon: Ammo")
 		int32 AmmoCurrent = 30;
-	
+
+	UPROPERTY(BlueprintAssignable, Category = "Weapon: Ammo")
+		FOnNoAmmoLeft OnNoAmmoLeft;
+
+	/** Using to ensure that no ammo event fire ones every time ammo left */
+	bool bCanBroadcastNoAmmoEvent = true;
+
+
 	/** Change Weapon Owner Speed */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Owner: Speed")
 		float CharacterSpeedModifier = 0.95f;
@@ -459,8 +471,10 @@ public:
 		TSubclassOf<ASWeaponTracerSimulated> TracerSimulatedClass;
 
 protected:
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
 		USkeletalMeshComponent* MeshComp;
+
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon: WeaponFX")
 		FName TargetTraceEffect = "Target";
@@ -506,6 +520,7 @@ protected:
 	// APlayerController* OwnerPlayerController;
 
 public:
+
 	/** Player Pose Recoil Multiplier */
 	UPROPERTY(Replicated, EditAnywhere, BlueprintReadWrite, Category = "Weapon: Aim")
 		FCharacterShootModifiers SpreadModifiers;
@@ -538,6 +553,7 @@ public:
 
 
 protected:
+
 	// PROTECTED RELOAD BLOCK ////////////////////////////////////////////////////////////////////////////////////////////
 
 	/** Monage Reload Speed Override, if 0 use Anim speed */
@@ -563,6 +579,7 @@ protected:
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 public:
+
 	// PUBLIC RELOAD BLOCK ///////////////////////////////////////////////////////////////////////////////////////////////
 
 	UFUNCTION(BlueprintCallable, Category = "Weapon: Ammo")
@@ -587,6 +604,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 protected:
+
 	// PROTECTED FIRE BLOCK //////////////////////////////////////////////////////////////////////////////////////////////
 
 	 /** IF key pressed true. else false */
@@ -633,6 +651,7 @@ protected:
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 public:
+
 	// PUBLIC FIRE BLOCK //////////////////////////////////////////////////////////////////////////////////////////////
 
 	/** Handle weapon fire logic type */
@@ -690,6 +709,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 protected:
+
 	// PROTECTED AIM BLOCK //////////////////////////////////////////////////////////////////////////////////////////////
 
 	UFUNCTION(Server, Reliable)
@@ -703,6 +723,7 @@ protected:
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 public:
+
 	// PUBLIC AIM BLOCK //////////////////////////////////////////////////////////////////////////////////////////////
 
 	FORCEINLINE void SetShouldAim(bool Val) { ServerSetShouldAim(Val); }

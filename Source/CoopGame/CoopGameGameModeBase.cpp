@@ -42,6 +42,7 @@ ACoopGameGameModeBase::ACoopGameGameModeBase()
 		PlayerStateClass = ACoopPlayerState::StaticClass();
 
 	// bot spawn defaults
+	bWaveSpawnEnableOnStart = false;
 	NrOfBotsToSpawn = 0;
 	NrOfBotsToSpawnMult = 2;
 	MaxNrOfBotsToSpawnPerWave = 10;
@@ -204,15 +205,21 @@ void ACoopGameGameModeBase::StartPlay()
 {
 	Super::StartPlay();
 
-	SetWaveState(EWaveState::WaitingToStart);
+	if (bWaveSpawnEnableOnStart)
+	{
+		SetWaveState(EWaveState::WaitingToStart);
 
-	PrepareForNextWave();  // first wave inititialize
+		PrepareForNextWave();  // first wave inititialize
+	}
 }
 
 void ACoopGameGameModeBase::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	CheckWaveState();
-	CheckAnyPlayerAlive();
+	if (bWaveSpawnEnableOnStart)
+	{
+		CheckWaveState();
+		CheckAnyPlayerAlive();
+	}
 }

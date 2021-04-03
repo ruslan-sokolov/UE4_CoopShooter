@@ -119,8 +119,8 @@ void ASCharacter::Tick(float DeltaTime)
 	//
 
 	// DEBUG STATE TODO: debug param on screen
-	DrawDebugString(GetWorld(), GetMesh()->GetBoneLocation(FName(TEXT("head"))) + FVector(0.0f, 30.0f, 30.0f), *FString::Printf(TEXT("%s"), *DebugCharState(CharacterState)), (AActor*)0, FColor::White, DeltaTime);
-	DrawDebugString(GetWorld(), GetMesh()->GetBoneLocation(FName(TEXT("head"))) + FVector(0.0f, -30.0f, 30.0f), *FString::Printf(TEXT("%d"), (int32)GetVelocity().Size()), (AActor*)0, FColor::White, DeltaTime);
+	// DrawDebugString(GetWorld(), GetMesh()->GetBoneLocation(FName(TEXT("head"))) + FVector(0.0f, 30.0f, 30.0f), *FString::Printf(TEXT("%s"), *DebugCharState(CharacterState)), (AActor*)0, FColor::White, DeltaTime);
+	// DrawDebugString(GetWorld(), GetMesh()->GetBoneLocation(FName(TEXT("head"))) + FVector(0.0f, -30.0f, 30.0f), *FString::Printf(TEXT("%d"), (int32)GetVelocity().Size()), (AActor*)0, FColor::White, DeltaTime);
 	//
 }
 
@@ -329,6 +329,8 @@ void ASCharacter::ServerSpawnWeapon_Implementation(TSubclassOf<ASWeapon> WeaponC
 {
 	ASWeapon* SpawnedWeapon = GetWorld()->SpawnActor<ASWeapon>(WeaponClass, GetActorLocation(), GetActorRotation());
 	SpawnedWeapon->ServerAttachToASCharacter(this);
+
+	OnCharacterWeaponSpawned.Broadcast(this, SpawnedWeapon);
 }
 
 

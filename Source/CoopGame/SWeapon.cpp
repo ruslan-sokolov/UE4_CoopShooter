@@ -120,15 +120,14 @@ void ASWeapon::BeginPlay()
 	Super::BeginPlay();
 }
 
-
 void ASWeapon::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
 	// DBG ammo todo: debug variable check
-	FVector Loc = MeshComp->GetSocketLocation(MuzzleSocketName);
-	Loc += GetActorForwardVector() * -30;
-	DrawDebugString(GetWorld(), Loc, *FString::Printf(TEXT("%d / %d"), AmmoCurrent, AmmoMax), (AActor*)0, FColor::White, DeltaTime);
+	// FVector Loc = MeshComp->GetSocketLocation(MuzzleSocketName);
+	// Loc += GetActorForwardVector() * -30;
+	//DrawDebugString(GetWorld(), Loc, *FString::Printf(TEXT("%d / %d"), AmmoCurrent, AmmoMax), (AActor*)0, FColor::White, DeltaTime);
 	//
 }
 
@@ -365,14 +364,17 @@ void ASWeapon::EnableWeaponLogicTick(bool Enable)
 			return;
 		}
 
-		if (CharOwner->IsLocallyControlled())
+		if (CharOwner->IsPlayerControlled())
 		{
-			GetWorldTimerManager().ClearTimer(TimerHandle_WeaponTickClient);
-			GetWorldTimerManager().SetTimer(TimerHandle_WeaponTickClient, this, &ASWeapon::WeaponLogicTickClient, WEAPON_TICK, true);
-		} 
-		else
-		{
-			UE_LOG(LogTemp, Warning, TEXT("%s ASWeapon::EnableWeaponLogicTick() WeaponTickClient can't run, CharOwner not LocalyControlled"), *GetName());
+			if (CharOwner->IsLocallyControlled())
+			{
+				GetWorldTimerManager().ClearTimer(TimerHandle_WeaponTickClient);
+				GetWorldTimerManager().SetTimer(TimerHandle_WeaponTickClient, this, &ASWeapon::WeaponLogicTickClient, WEAPON_TICK, true);
+			}
+			else
+			{
+				UE_LOG(LogTemp, Warning, TEXT("%s ASWeapon::EnableWeaponLogicTick() WeaponTickClient can't run, CharOwner not LocalyControlled"), *GetName());
+			}
 		}
 	}
 	else
@@ -615,7 +617,7 @@ void ASWeapon::OnRep_HitScanTrace()
 	if (FireLogicType == EWeaponFireLogicType::LineTrace)
 		PlayImpactEffects();
 	
-	if (CharOwner && CharOwner->IsLocallyControlled())
+	if (CharOwner && CharOwner->IsPlayerControlled() && CharOwner->IsLocallyControlled())
 	{
 		AddRecoil();
 		PlayCameraShakeEffect();
@@ -633,8 +635,21 @@ void ASWeapon::Fire()
 
 void ASWeapon::ServerFire_Implementation()
 {
-	if (bShotIsDelayed || bIsReloading || AmmoCurrent == 0)
+	if (bShotIsDelayed || bIsReloading)
 	{
+		return;
+	}
+
+	// If No Ammo Play No_Ammo_FX and return
+	if (AmmoCurrent == 0)
+	{
+		if (bCanBroadcastNoAmmoEvent)
+		{
+			bCanBroadcastNoAmmoEvent = false;
+
+			OnNoAmmoLeft.Broadcast(this);
+		}
+
 		return;
 	}
 
@@ -671,9 +686,11 @@ void ASWeapon::ServerFire_Implementation()
 	if (FireLogicType == EWeaponFireLogicType::LineTrace)
 		PlayImpactEffects();
 	
-	PlayCameraShakeEffect();
-	
-	AddRecoil();
+	if (CharOwner && CharOwner->IsPlayerControlled())
+	{
+		PlayCameraShakeEffect();
+		AddRecoil();
+	}
 
 	if (FireMode == EWeaponFireMode::Fullauto) {
 		GetWorldTimerManager().ClearTimer(TimerHandle_FireCoolDown);
@@ -765,6 +782,8 @@ void ASWeapon::ServerFinishReload_Implementation()
 {
 	AmmoCurrent = AmmoMax;
 	bIsReloading = false;
+
+	bCanBroadcastNoAmmoEvent = true; // recharge no ammo event for next use
 
 }  // server finish reload
 
