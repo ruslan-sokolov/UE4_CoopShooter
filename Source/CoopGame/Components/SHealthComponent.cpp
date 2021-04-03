@@ -14,6 +14,9 @@ USHealthComponent::USHealthComponent()
 
 	bIsDead = false;
 
+	TeamNum = 255;
+	bHasTeam = false;
+
 	SetIsReplicated(true);
 }
 
@@ -47,6 +50,12 @@ void USHealthComponent::HandleTakeAnyDamage(AActor* DamagedActor, float Damage,
 		return;
 	}
 
+	// friendly fire
+	if (DamageCauser != DamagedActor && IsFriendly(DamagedActor, InstigatedBy->GetPawn()))
+	{
+		return;
+	}
+
 	// Update health clamped
 	Health = FMath::Clamp(Health - Damage, 0.0f, DefaultHealth);
 
@@ -66,6 +75,32 @@ void USHealthComponent::HandleTakeAnyDamage(AActor* DamagedActor, float Damage,
 		}
 	}
 
+}
+
+bool USHealthComponent::IsFriendly(AActor* ActorLeft, AActor* ActorRight)
+{
+	if (ActorLeft == nullptr || ActorRight == nullptr)
+	{
+		// Assume hostage
+		return false;
+	}
+
+	USHealthComponent* HealthCompLeft = Cast<USHealthComponent>(ActorLeft->GetComponentByClass(USHealthComponent::StaticClass()));
+	USHealthComponent* HealthCompRight = Cast<USHealthComponent>(ActorRight->GetComponentByClass(USHealthComponent::StaticClass()));
+
+	if (!HealthCompLeft->bHasTeam || !HealthCompRight->bHasTeam)
+	{
+		// Assume hostage
+		return false;
+	}
+
+	if (HealthCompLeft == nullptr || HealthCompRight == nullptr)
+	{
+		// Assume hostage
+		return false;
+	}
+
+	return HealthCompLeft->TeamNum == HealthCompRight->TeamNum;
 }
 
 void USHealthComponent::Heal_Implementation(float HealAmount)

@@ -507,7 +507,7 @@ void ASWeapon::FireLogic_LineTrace()
 		else if (LastHit.Distance >= 2500.0f)
 			DrawSize *= 2;
 
-		DrawDebugSphere(GetWorld(), LastHit.ImpactPoint, DrawSize, 12, FColor::Cyan, true, 1.0f);
+		DrawDebugSphere(GetWorld(), LastHit.ImpactPoint, DrawSize, 4, FColor::Cyan, true, 1.0f);
 	}
 }  // actual single shot logic (fire line trace)
 

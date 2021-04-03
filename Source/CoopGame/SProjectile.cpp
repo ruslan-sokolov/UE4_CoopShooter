@@ -17,7 +17,6 @@
 #include "DrawDebugHelpers.h"
 #include "Net/UnrealNetwork.h"
 
-
 ASProjectile::ASProjectile()
 {
 	PrimaryActorTick.bCanEverTick = false;
@@ -105,6 +104,15 @@ void ASProjectile::Detonate()
 
 	TArray<AActor*> IgnoredActors;
 	UGameplayStatics::ApplyRadialDamage(GetWorld(), Damage, GetActorLocation(), DamageRadius, DamageType, IgnoredActors, GetOwner(), GetInstigatorController(), bDoFullDamage);
+
+	// debug
+	auto CVar = IConsoleManager::Get().FindConsoleVariable(TEXT("COOP.DebugWeapons.Shot"));
+	if (CVar)
+	{
+		int32 Value = CVar->GetInt();
+		if (Value > 0) DrawDebugSphere(GetWorld(), GetActorLocation(), DamageRadius, 12, FColor::Red, false, 4.0f);
+	}
+	//
 
 	// Destroy but finish replicatation hack
 	// Destroy();

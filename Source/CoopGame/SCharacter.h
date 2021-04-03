@@ -103,7 +103,7 @@ protected:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Components")
 		USpringArmComponent* SpringArmComp;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Components")
+	UPROPERTY(VisibleDefaultsOnly, Category = "Components")
 		USHealthComponent* HealthComp;
 
 	//
