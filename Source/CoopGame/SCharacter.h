@@ -104,7 +104,7 @@ protected:
 		USpringArmComponent* SpringArmComp;
 
 	UPROPERTY(VisibleDefaultsOnly, Category = "Components")
-		USHealthComponent* HealthComp;
+		USHealthComponent* HealthComponent;
 
 	//
 
