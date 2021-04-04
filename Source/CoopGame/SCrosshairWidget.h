@@ -21,7 +21,7 @@ class COOPGAME_API USCrosshairWidget : public UUserWidget
 protected:
 
 	UPROPERTY(BlueprintReadWrite, Category = "Spread Params")
-		float CrosshairTranslationOffsetMax = 100.0f;
+		float CrosshairTranslationOffsetMax = 30.0f;
 
 	float SpreadAngleClampMin = 1.0f;
 	float SpreadAngleClampMax = 6.0f;

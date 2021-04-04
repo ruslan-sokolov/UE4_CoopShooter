@@ -51,7 +51,7 @@ void USHealthComponent::HandleTakeAnyDamage(AActor* DamagedActor, float Damage,
 	}
 
 	// dismiss friendly fire, but allow self damage
-	if (DamageCauser != DamagedActor && IsFriendly(DamagedActor, InstigatedBy->GetPawn()))
+	if (DamageCauser != nullptr && DamagedActor != nullptr && DamageCauser != DamagedActor && IsFriendly(DamagedActor, InstigatedBy->GetPawn()))
 	{
 		return;
 	}

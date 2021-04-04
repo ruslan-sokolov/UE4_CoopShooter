@@ -96,6 +96,11 @@ void ACoopGameGameModeBase::PrepareForNextWave()
 	SetWaveState(EWaveState::PreparingNextWave);
 
 	RestartDeadPlayers();
+
+	// debug
+	if (GEngine)
+		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Green, "[GameMode] Prep next spawn wave.");
+	//
 }
 
 void ACoopGameGameModeBase::CheckWaveState()
@@ -128,11 +133,6 @@ void ACoopGameGameModeBase::CheckWaveState()
 
 	if (!bIsAnyBotAlive)
 	{
-		// debug
-		if (GEngine)
-			GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Yellow, "[GameMode] Prep next spawn wave");
-		//
-
 		SetWaveState(EWaveState::WaveComplete);
 
 		PrepareForNextWave();
@@ -174,7 +174,7 @@ void ACoopGameGameModeBase::GameOver()
 
 	// debug
 	if (GEngine)
-		GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Yellow, "[GameMode] Game over. All players are dead.");
+		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, "[GameMode] Game over. All players are dead.");
 	//
 
 	SetWaveState(EWaveState::GameOver);

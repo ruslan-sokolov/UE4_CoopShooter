@@ -192,6 +192,7 @@ struct FCharacterShootModifiers
 	UPROPERTY(BlueprintReadOnly, Category = "Total Modifiers")
 		float CurrentTotalModifier;
 
+
 	/** Utility to return Character Pos Modifier. */
 	FORCEINLINE float GetPosModifier() const {return CurrentPosModifier;}
 
@@ -322,13 +323,16 @@ struct FCharacterShootModifiers
 		return CurrentTotalModifier;
 	}
 
-
+	
 	FCharacterShootModifiers() { CurrentAimingModifier = AimingModifierMax; CurrentFireRateModifier = FireRateModifierMin; CurrentVelocityModifier = VelocityModiferMax;  }
-
-	explicit FCharacterShootModifiers(float Standing, float Crouch, float Prone, float InAir, float VelocityMin, float VelocityMax, float FireRatePenaltyTimeMin, float FireRatePenaltyTimeMax, float FireRatePenalty) : 
-		StandingModifier(Standing), CrouchModifier(Crouch), ProneModifier(Prone), InAirModifier(InAir), VelocityModiferMin(VelocityMin), VelocityModiferMax(VelocityMax), 
+	/*
+	explicit FCharacterShootModifiers(float Standing, float Crouch, float Prone, float InAir, 
+		float VelocityMin, float VelocityMax, float VelocityZero, 
+		float FireRatePenaltyTimeMin, float FireRatePenaltyTimeMax, float FireRatePenalty) : 
+		StandingModifier(Standing), CrouchModifier(Crouch), ProneModifier(Prone), InAirModifier(InAir), 
+		VelocityModiferMin(VelocityMin), VelocityModiferMax(VelocityMax), VelocityModifierZero(VelocityZero)
 		FireRateTimeMinPenalty(FireRatePenaltyTimeMin), FireRateTimeMaxPenalty(FireRatePenaltyTimeMax), FireRatePenaltyPerShotMax(FireRatePenalty) 
-	{ FCharacterShootModifiers(); }
+	{ FCharacterShootModifiers(); }*/
 
 };
 
@@ -372,8 +376,8 @@ struct FRecoilInput
 	/* Utility to Drop Recoil Accumulation Values */
 	FORCEINLINE void ClearRecoilAcommulation() { RecoilAccumulationYaw = 0.0f; RecoilAccumulationPitch = 0.0f; RecoilFadeProgress = 0.0f; }
 
-	FRecoilInput() {}
-	explicit FRecoilInput(float PMin, float PMax, float YMin, float YMax) : PitchMin(PMin), PitchMax(PMax), YawMin(YMin), YawMax(YawMax) {}
+	//FRecoilInput() {}
+	//explicit FRecoilInput(float PMin, float PMax, float YMin, float YMax) : PitchMin(PMin), PitchMax(PMax), YawMin(YMin), YawMax(YawMax) {}
 
 };
 
