@@ -104,6 +104,9 @@ protected:
 
 	void LaunchOnStuck();
 
+	UFUNCTION(NetMulticast, Unreliable)
+		void PlayLaunchFX();
+
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	// [Tracker bot explosion logic] /////////////////////////////////////////////////////////////////////////////////////
@@ -165,6 +168,9 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Tracker Bot: Explosion")
 		USoundBase* ExplosionSound;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Tracker Bot: Launch")
+		USoundBase* LaunchOnStuckSound;
 
 	UFUNCTION()
 		void OnMeshCompHit(UPrimitiveComponent* HitComponent, AActor* OtherActor, 

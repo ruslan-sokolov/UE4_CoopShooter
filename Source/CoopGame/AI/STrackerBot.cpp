@@ -59,7 +59,7 @@ ASTrackerBot::ASTrackerBot()
 	bUseVelocityChange = true;
 	MovementForce = 1000.0f;
 	RequiredDistanceToTarget = 100.0f;
-	MoveControlTick = 0.1f;
+	MoveControlTick = 1.0f;
 
 	// defauls launch on stuck
 	bUseLaunchWhenStuck = true;
@@ -87,6 +87,7 @@ ASTrackerBot::ASTrackerBot()
 	AngularVelocityOnJumpExplosion = FVector(0.0f, 0.0f, 3000.0f);
 
 	// defaults damage boost
+	// @ToDo: Fix crazy damage boost issue
 	bAllowDamageBoost = true;
 	DamageBoostCheckTime = 1.0f;
 	NearbyBotMaxDamageBoost = 5;
@@ -132,29 +133,57 @@ void ASTrackerBot::BeginPlay()
 
 void ASTrackerBot::ChooseTargetCharacter()
 {
-	if (ChasedCharacter != nullptr)
-		return;
+	//if (ChasedCharacter != nullptr)
+	//	return;
 
-	ChasedCharacter = UGameplayStatics::GetPlayerCharacter(this, 0);  // if we play as client, it will fire when client will be authorized
-		
-	if (ChasedCharacter)
+	ACharacter* ClosestPlayerCharacter = nullptr;
+	float ClosestPlayerCharacterDistance = FLT_MAX;
+
+	// iterate on player controllers to find nearest alive character to chase
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 	{
-		NextPathPoint = GetNextPathPoint();
-			
-		// debug
-		if (DebugTrackerBot > 0 && GEngine)
+		APlayerController* PC = It->Get();
+		if (PC)
 		{
-			int32 PlayerId = 0x7FFFFFFF;
-
-			APlayerController* PlayerController = UGameplayStatics::GetPlayerController(GetWorld(), 0);
-			if (PlayerController)
-				PlayerId = PlayerController->PlayerState->GetPlayerId();
-
-			FString msg = FString::Printf(TEXT("ChasedCharacter Selected %d"), PlayerId);
-
-			GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Purple, *msg);
+			APawn* PlayerPawn = PC->GetPawn();
+			if (PlayerPawn)
+			{
+				ACharacter* Character = Cast<ACharacter>(PlayerPawn);
+				if (Character)
+				{
+					// check if character is alive
+					USHealthComponent* CharacterHealthComp = Cast<USHealthComponent>(Character->GetComponentByClass(USHealthComponent::StaticClass()));
+					if (CharacterHealthComp && CharacterHealthComp->GetHealth() > 0.0f)
+					{
+						// check if character is hostage
+						if (!USHealthComponent::IsFriendly(this, Character))
+						{
+							// check if character closer then previous one
+							float DistanceToCharacter = (Character->GetActorLocation() - GetActorLocation()).Size();
+							if (DistanceToCharacter < ClosestPlayerCharacterDistance)
+							{
+								ClosestPlayerCharacterDistance = DistanceToCharacter;
+								ClosestPlayerCharacter = Character;
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+		
+	if (ClosestPlayerCharacter)  // Update ChasedCharacter if new one is valid
+	{
+		// debug
+		if (DebugTrackerBot > 0 && GEngine && ClosestPlayerCharacter != ChasedCharacter)
+		{
+			FString Msg = FString::Printf(TEXT("ChasedCharacter Updated %s"), *ClosestPlayerCharacter->GetName());
+			GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Purple, *Msg);
 		}
 		//
+
+		ChasedCharacter = ClosestPlayerCharacter;
+		NextPathPoint = GetNextPathPoint();
 	}
 }
 
@@ -250,6 +279,7 @@ bool ASTrackerBot::IsStuckDesisionMake()
 
 void ASTrackerBot::LaunchOnStuck()
 {
+	NextPathPoint = GetNextPathPoint();  // update new path point
 
 	FVector Direction = NextPathPoint - GetActorLocation();
 	Direction.Normalize();
@@ -257,9 +287,19 @@ void ASTrackerBot::LaunchOnStuck()
 
 	MeshComp->AddImpulse(ImpulseTowardsNextPathPoint, NAME_None, bUseVelocityChange);
 
+	if (ExplosionSound)
+	{
+		PlayLaunchFX();
+	}
+
 	// debug
 	if (DebugTrackerBot > 0)
 		DrawDebugDirectionalArrow(GetWorld(), GetActorLocation(), GetActorLocation() + ImpulseTowardsNextPathPoint, 32, FColor::Blue, false, 3.0f, 0, 2.0f);
+}
+
+void ASTrackerBot::PlayLaunchFX_Implementation()
+{
+	UGameplayStatics::PlaySoundAtLocation(GetWorld(), LaunchOnStuckSound, GetActorLocation());
 }
 
 
