@@ -50,7 +50,7 @@ void USHealthComponent::HandleTakeAnyDamage(AActor* DamagedActor, float Damage,
 		return;
 	}
 
-	// dismiss friendly fire, but allow self damage
+	// dismiss friendly fire, but allow self damage  // Todo: can't kill my self with grenade launcher
 	if (DamageCauser != nullptr && DamagedActor != nullptr && DamageCauser != DamagedActor && IsFriendly(DamagedActor, InstigatedBy->GetPawn()))
 	{
 		return;
@@ -122,12 +122,12 @@ void USHealthComponent::Heal_Implementation(float HealAmount)
 	AActor* Owner = GetOwner();
 	if (Owner != nullptr) OwnerName = Owner->GetName();
 	
-	FString Msg = FString::Printf(TEXT("%s Health Changed: %s (+%s)"), *OwnerName, *FString::SanitizeFloat(Health), *FString::SanitizeFloat(HealAmount));
-	
-	UE_LOG(LogTemp, Warning, TEXT("%s"), *Msg);
+	//FString Msg = FString::Printf(TEXT("%s Health Changed: %s (+%s)"), *OwnerName, *FString::SanitizeFloat(Health), *FString::SanitizeFloat(HealAmount));
+	//
+	//UE_LOG(LogTemp, Warning, TEXT("%s"), *Msg);
 
-	if (GEngine)
-		GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Magenta, Msg);
+	//if (GEngine)
+	//	GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Magenta, Msg);
 	//
 }
 
