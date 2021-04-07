@@ -103,7 +103,7 @@ protected:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Components")
 		USpringArmComponent* SpringArmComp;
 
-	UPROPERTY(VisibleDefaultsOnly, Category = "Components")
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 		USHealthComponent* HealthComponent;
 
 	//
@@ -162,15 +162,20 @@ public:
 	void MoveForward(float Val);
 	void MoveRight(float Val);
 
-	void BeginCrouch();
-	void EndCrouch();
+	UFUNCTION(BlueprintCallable, Category = "Character Movement: Crouch")
+		void BeginCrouch();
+	
+	UFUNCTION(BlueprintCallable, Category = "Character Movement: Crouch")
+		void EndCrouch();
 
-	void BeginSprint();
+	UFUNCTION(BlueprintCallable, Category = "Character Movement: Sprint")
+		void BeginSprint();
 
 	UFUNCTION(Server, Unreliable)
 		void ServerBeginSprint();
 	
-	void EndSprint();
+	UFUNCTION(BlueprintCallable, Category = "Character Movement: Sprint")
+		void EndSprint();
 
 	UFUNCTION(Server, Unreliable)
 		void ServerEndSprint();

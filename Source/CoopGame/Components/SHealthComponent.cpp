@@ -64,6 +64,8 @@ void USHealthComponent::HandleTakeAnyDamage(AActor* DamagedActor, float Damage,
 	bIsDead = Health <= 0.0f;
 
 	OnHealthChanged.Broadcast(this, Health, Damage, DamageType, InstigatedBy, DamageCauser);
+
+	// @Todo: add some param
 	OnHealthChangedClient.Broadcast(); // client event broadcast for server player too (currenly used for hp in hud)
 	
 	if (bIsDead)
@@ -88,13 +90,13 @@ bool USHealthComponent::IsFriendly(AActor* ActorLeft, AActor* ActorRight)
 	USHealthComponent* HealthCompLeft = Cast<USHealthComponent>(ActorLeft->GetComponentByClass(USHealthComponent::StaticClass()));
 	USHealthComponent* HealthCompRight = Cast<USHealthComponent>(ActorRight->GetComponentByClass(USHealthComponent::StaticClass()));
 
-	if (!HealthCompLeft->bHasTeam || !HealthCompRight->bHasTeam)
+	if (HealthCompLeft == nullptr || HealthCompRight == nullptr)
 	{
 		// Assume hostage
 		return false;
 	}
 
-	if (HealthCompLeft == nullptr || HealthCompRight == nullptr)
+	if (!HealthCompLeft->bHasTeam || !HealthCompRight->bHasTeam)
 	{
 		// Assume hostage
 		return false;

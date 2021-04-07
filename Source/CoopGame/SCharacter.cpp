@@ -19,6 +19,8 @@
 
 #include "GameFramework/PlayerState.h"
 
+#include "Kismet/KismetMathLibrary.h"
+
 // Sets default values
 ASCharacter::ASCharacter()
 {
@@ -120,6 +122,15 @@ void ASCharacter::Tick(float DeltaTime)
 	// DEBUG STATE TODO: debug param on screen
 	// DrawDebugString(GetWorld(), GetMesh()->GetBoneLocation(FName(TEXT("head"))) + FVector(0.0f, 30.0f, 30.0f), *FString::Printf(TEXT("%s"), *DebugCharState(CharacterState)), (AActor*)0, FColor::White, DeltaTime);
 	// DrawDebugString(GetWorld(), GetMesh()->GetBoneLocation(FName(TEXT("head"))) + FVector(0.0f, -30.0f, 30.0f), *FString::Printf(TEXT("%d"), (int32)GetVelocity().Size()), (AActor*)0, FColor::White, DeltaTime);
+	
+	// debug health
+	FVector HealthLocation = GetMesh()->GetBoneLocation(FName(TEXT("head"))) + FVector(0.0f, 0.0f, 40.0f);
+	FString HealthStr = FString::Printf(TEXT("%s"), *FString::SanitizeFloat(HealthComponent->GetHealth()));
+	
+	float ColorLerp = FMath::Clamp(HealthComponent->GetHealth() / HealthComponent->DefaultHealth, 0.0f, 1.0f);
+	FColor HealthColor = UKismetMathLibrary::LinearColorLerp(FColor::Red, FColor::Green, ColorLerp).ToFColor(false);
+	
+	DrawDebugString(GetWorld(), HealthLocation, *HealthStr, (AActor*)0, HealthColor, DeltaTime);
 	//
 }
 

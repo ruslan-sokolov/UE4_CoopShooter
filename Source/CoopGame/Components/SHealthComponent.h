@@ -10,7 +10,7 @@
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_SixParams(FOnHealthChangedSignature, USHealthComponent*, HealthComp, float, Health, float, HealthDelta, const class UDamageType*, DamageType, class AController*, InstigatedBy, AActor*, DamageCauser);
 
 /**
-	Delegate on health change network clients only.
+	Delegate on health change network clients only. 	// @Todo: add some param
 */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnHealthChangedClientSignature);
 
